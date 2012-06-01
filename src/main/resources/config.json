@@ -1,0 +1,138 @@
+{
+  "genderChoiceRequired": true,
+  "sameGenderMarriageAllowed": true,
+  "globalAnnouncePriestMarriages": true,
+  "loggingDebug": false,
+  "groupSettings": {
+    "childSettings": {
+      "maximumChildren": 30,
+      "priority": "LOWEST",
+      "perUseCost": 0.0,
+      "perks": [
+        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc"
+      ]
+    },
+    "friendSettings": {
+      "maximumFriends": 30,
+      "priority": "LOWEST",
+      "perUseCost": 0.0,
+      "perks": [
+        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc"
+      ]
+    },
+    "relationshipSettings": {
+      "maximumRelationships": 30,
+      "priority": "LOWEST",
+      "perUseCost": 0.0,
+      "perks": [
+        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc"
+      ]
+    },
+    "affairSettings": {
+      "maximumAffairs": 30,
+      "priority": "LOWEST",
+      "perUseCost": 0.0,
+      "perks": [
+        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc"
+      ]
+    },
+    "engagementSettings": {
+      "engagementPeriod": 300,
+      "priority": "LOWEST",
+      "perUseCost": 50.0,
+      "perks": [
+        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc"
+      ]
+    },
+    "divorceSettings": {
+      "bitternessPeriod": 300,
+      "priority": "LOWEST",
+      "perUseCost": 50.0,
+      "perks": [
+        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc"
+      ]
+    },
+    "marriageSettings": {
+      "honeymoonPeriod": 300,
+      "priority": "LOWEST",
+      "perUseCost": 0.0,
+      "perks": [
+        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc"
+      ]
+    },
+    "lawyerSettings": {
+      "bitternessPeriod": 0,
+      "priority": "LOWEST",
+      "perUseCost": 500.0,
+      "perks": [
+        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc"
+      ]
+    },
+    "priestSettings": {
+      "honeymoonPeriod": 0,
+      "priority": "LOWEST",
+      "perUseCost": 500.0,
+      "perks": [
+        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc"
+      ]
+    }
+  },
+  "perkSettings": [
+    {
+      "type": "com.netprogs.minecraft.plugins.social.config.settings.perk.GiftSettings",
+      "data": {
+        "name": "gift",
+        "coolDownPeriod": 0,
+        "perUseCost": 0.0,
+        "maximumNumber": 10
+      }
+    },
+    {
+      "type": "com.netprogs.minecraft.plugins.social.config.settings.perk.TellSettings",
+      "data": {
+        "name": "tell",
+        "coolDownPeriod": 0,
+        "perUseCost": 0.0
+      }
+    },
+    {
+      "type": "com.netprogs.minecraft.plugins.social.config.settings.perk.StickySettings",
+      "data": {
+        "name": "sticky",
+        "coolDownPeriod": 0,
+        "perUseCost": 0.0,
+        "maximumNumber": 10
+      }
+    },
+    {
+      "type": "com.netprogs.minecraft.plugins.social.config.settings.perk.TeleportSettings",
+      "data": {
+        "name": "teleport",
+        "coolDownPeriod": 0,
+        "perUseCost": 0.0
+      }
+    },
+    {
+      "type": "com.netprogs.minecraft.plugins.social.config.settings.perk.PlayerDamageSettings",
+      "data": {
+        "damageAllowedFromPlayer": false,
+        "damageAllowedFromProjectile": false,
+        "damageAllowedFromTameable": false,
+        "name": "damage",
+        "coolDownPeriod": 60
+      }
+    },
+    {
+      "type": "com.netprogs.minecraft.plugins.social.config.settings.perk.WorldGuardSettings",
+      "data": {
+        "name": "worldguard"
+      }
+    },
+    {
+      "type": "com.netprogs.minecraft.plugins.social.config.settings.perk.LWCSettings",
+      "data": {
+        "name": "lwc"
+      }
+    }
+  ]
+}

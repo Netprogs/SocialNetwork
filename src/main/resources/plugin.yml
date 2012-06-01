@@ -1,0 +1,114 @@
+name: SocialNetwork
+main: com.netprogs.minecraft.plugins.social.SocialNetworkPlugin
+version: 1.1.0
+author: Scott Milne
+description: Provides social networking (dating, friendship, marriage etc).
+depend: [Vault]
+softdepend: [WorldGuard, LWC]
+commands:
+   social:
+      description: Multiple commands, use "/social help" for details.
+      usage: "/social help"
+      aliases: [s,soc]
+permissions:
+   social.*:
+      description: Gives access to all social commands except jobs.
+      children:
+         social.main.*: true
+         social.group.*: true
+         social.perk.*: true
+   social.main.*:
+      description: Gives access to all social main commands.
+      children:
+         social.join: true
+         social.quit: true
+         social.alerts: true
+         social.requests: true
+         social.ignore: true
+         social.online: true
+         social.help: true
+   social.group.*:
+      description: Gives access to all social group commands.
+      children:
+         social.friend: true
+         social.child: true
+         social.relationship: true
+         social.affair: true
+         social.engagement: true
+         social.marriage: true
+         social.divorce: true
+         social.help: true
+   social.job.*:
+      description: Gives access to all social job commands.
+      children:
+         social.priest: true
+         social.lawyer: true
+         social.help: true
+   social.perk.*:
+      description: Gives access to all social perk commands.
+      children:
+         social.teleport: true
+         social.tell: true
+         social.gift: true
+         social.sticky: true
+         social.help: true
+   social.help:
+      description: Ability to use help pages.
+      default: true
+   social.join:
+      description: Ability to join the network.
+      default: op
+   social.quit:
+      description: Ability to quit the network.
+      default: op
+   social.alerts:
+      description: Ability to view available alerts.
+      default: op
+   social.requests:
+      description: Ability to view available requests.
+      default: op
+   social.ignore:
+      description: Ability to ignore players in the network.
+      default: op
+   social.online:
+      description: Ability to view all group members that are online.
+      default: op
+   social.friend:
+      description: Ability to add friends.
+      default: op
+   social.child:
+      description: Ability to add children.
+      default: op
+   social.relationship:
+      description: Ability to add relationships.
+      default: op
+   social.affair:
+      description: Ability to affairs.
+      default: op
+   social.engagement:
+      description: Ability to become engaged.
+      default: op
+   social.marriage:
+      description: Ability to become married without a priest.
+      default: op
+   social.divorce:
+      description: Ability to become divorced without a lawyer.
+      default: op
+   social.priest:
+      description: Ability to marry people.
+      default: op
+   social.lawyer:
+      description: Ability to divorce people.
+      default: op
+   social.teleport:
+      description: Allows the usage of all the teleport commands.
+      default: op
+   social.tell:
+      description: Allows the usage of all the tell commands.
+      default: op
+   social.sticky:
+      description: Allows the usage of all the sticky commands.
+      default: op
+   social.gift:
+      description: Allows the usage of all the gift commands
+      default: op
