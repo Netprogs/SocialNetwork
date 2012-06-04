@@ -125,32 +125,21 @@ public class WorldGuardIntegration extends PluginIntegration {
         // Options granted to the member past that point is up to the region flags.
         for (ProtectedRegion region : regionMap.values()) {
 
-            System.out.println("region: " + region.getId());
-
             // skip it if it has nobody
             if (!region.hasMembersOrOwners()) {
                 continue;
             }
-            System.out.println("region has owner: " + region.getId());
 
             // check to see if the player owns this region
             if (region.isOwner(playerName)) {
-
-                System.out.println("region is owner: " + playerName);
-
-                System.out.println("region is not member: " + memberName);
-                System.out.println("memberAsOwner: " + memberAsOwner);
 
                 if (memberAsOwner) {
 
                     // get the list of owners and adjust as needed
                     DefaultDomain domain = region.getOwners();
                     if (remove) {
-                        System.out.println("remove owner: " + memberName);
                         domain.removePlayer(memberName);
                     } else {
-                        System.out.println("remove member: " + memberName);
-                        System.out.println("add owner: " + memberName);
                         domain.addPlayer(memberName);
                     }
 
@@ -168,24 +157,15 @@ public class WorldGuardIntegration extends PluginIntegration {
 
                     // get the list of members and adjust as needed
                     DefaultDomain domain = region.getMembers();
-                    System.out.println(domain.getPlayers());
 
                     if (remove) {
-                        System.out.println("remove member: " + memberName);
                         domain.removePlayer(memberName);
                     } else {
-
-                        System.out.println("add member: " + memberName);
                         domain.addPlayer(memberName);
                     }
 
-                    System.out.println(domain.getPlayers());
-
                     // update the member list
                     region.setMembers(domain);
-
-                    DefaultDomain domain2 = region.getMembers();
-                    System.out.println("reload: " + domain2.getPlayers());
 
                     // and save it
                     try {

@@ -295,7 +295,7 @@ public class CommandTeleport extends PerkCommand<TeleportSettings, PersonTelepor
      */
     @Override
     public TeleportSettings getProcessPerkSettings(SocialPerson person, List<String> commandArguments) {
-        System.out.println(commandArguments);
+
         // this command requires processing when teleporting players to/from the other
         if (commandArguments.size() > 0
                 && (commandArguments.get(0).equals("tm") || commandArguments.get(0).equals("ty"))) {
