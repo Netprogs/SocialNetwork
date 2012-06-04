@@ -35,6 +35,8 @@ import com.netprogs.minecraft.plugins.social.listener.perk.LWCListener;
 import com.netprogs.minecraft.plugins.social.listener.perk.PlayerDamageListener;
 import com.netprogs.minecraft.plugins.social.listener.perk.WorldGuardListener;
 
+import org.bukkit.Bukkit;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -71,15 +73,29 @@ public class SocialNetworkPlugin extends JavaPlugin {
         }
 
         // if WorldGuard is available, attach the listener for it
-        WorldGuardIntegration.getInstance().initialize(this);
-        if (WorldGuardIntegration.getInstance().isEnabled()) {
-            getServer().getPluginManager().registerEvents(new WorldGuardListener(), this);
+        if (isPluginAvailable("WorldGuard")) {
+
+            WorldGuardIntegration.getInstance().initialize(this);
+            if (WorldGuardIntegration.getInstance().isEnabled()) {
+                getServer().getPluginManager().registerEvents(new WorldGuardListener(), this);
+            }
+
+        } else {
+
+            logger.info("[" + pdfFile.getName() + "] " + "Could not find WorldGuard; features are disabled.");
         }
 
         // if LWC is available, attach the listener for it
-        LWCIntegration.getInstance().initialize(this);
-        if (LWCIntegration.getInstance().isEnabled()) {
-            getServer().getPluginManager().registerEvents(new LWCListener(), this);
+        if (isPluginAvailable("LWC")) {
+
+            LWCIntegration.getInstance().initialize(this);
+            if (LWCIntegration.getInstance().isEnabled()) {
+                getServer().getPluginManager().registerEvents(new LWCListener(), this);
+            }
+
+        } else {
+
+            logger.info("[" + pdfFile.getName() + "] " + "Could not find LWC; features are disabled.");
         }
 
         // attach to the "social" command
@@ -112,5 +128,14 @@ public class SocialNetworkPlugin extends JavaPlugin {
 
     public File getPluginFolder() {
         return pluginFolder;
+    }
+
+    private boolean isPluginAvailable(String name) {
+
+        Plugin plugin = Bukkit.getServer().getPluginManager().getPlugin(name);
+        if (plugin == null) {
+            return false;
+        }
+        return true;
     }
 }

@@ -21,10 +21,6 @@ package com.netprogs.minecraft.plugins.social.command;
  */
 
 public enum SocialNetworkPermission {
-    // currentOthers {
-    // public String toString() {
-    // return "current.others";
-    // }
-    // },
+
     join, quit, requests, friend, child, relationship, affair, engagement, marriage, divorce, priest, lawyer
 }

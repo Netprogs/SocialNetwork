@@ -6,7 +6,7 @@
 	<name>SocialNetwork</name>
 	<artifactId>SocialNetwork</artifactId>
 	<groupId>com.netprogs.minecraft.plugins.social</groupId>
-	<version>1.1.0</version>
+	<version>1.1.1</version>
 	<packaging>jar</packaging>
 	<url>http://maven.apache.org</url>
   
