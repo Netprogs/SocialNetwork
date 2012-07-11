@@ -21,6 +21,8 @@ package com.netprogs.minecraft.plugins.social;
  */
 
 import java.io.File;
+import java.io.IOException;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkDispatcher;
@@ -46,6 +48,9 @@ public class SocialNetworkPlugin extends JavaPlugin {
 
     // expose the instance of this class as a global so we can better access it's methods
     public static SocialNetworkPlugin instance;
+
+    // used for sending completely anonymous data to http://mcstats.org for usage tracking
+    private Metrics metrics;
 
     private String pluginName;
     private File pluginFolder;
@@ -104,6 +109,14 @@ public class SocialNetworkPlugin extends JavaPlugin {
         // attach the events to our listeners
         getServer().getPluginManager().registerEvents(new PlayerDamageListener(), this);
         getServer().getPluginManager().registerEvents(new PlayerJoinListener(), this);
+
+        // start up the metrics engine
+        try {
+            metrics = new Metrics(this);
+            metrics.start();
+        } catch (IOException e) {
+            logger.log(Level.WARNING, "Error while enabling Metrics.");
+        }
 
         // Okay, we're done
         logger.info("[" + pdfFile.getName() + "] v" + pdfFile.getVersion() + " has been enabled.");

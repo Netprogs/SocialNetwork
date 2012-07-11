@@ -139,7 +139,7 @@ public class SocialNetwork {
         synchronized (socialPerson) {
 
             // get the person data
-            Person person = loadedPersonMap.get(socialPerson.getName().toLowerCase()).getPerson();
+            Person person = getSocialNetworkMap().get(socialPerson.getName().toLowerCase()).getPerson();
 
             // remove all their relations to everyone and send alerts to each of them
             removeFromAllGroups(socialPerson);
@@ -160,7 +160,7 @@ public class SocialNetwork {
         synchronized (socialPerson) {
 
             // get the person data
-            Person person = loadedPersonMap.get(socialPerson.getName().toLowerCase()).getPerson();
+            Person person = getSocialNetworkMap().get(socialPerson.getName().toLowerCase()).getPerson();
 
             // Saves to their data file
             personDataManager.savePerson(person);
@@ -263,7 +263,7 @@ public class SocialNetwork {
         Map<String, SocialPerson> notifyPlayers = new HashMap<String, SocialPerson>();
 
         // go through each group type and remove this user from their lists
-        Person person = loadedPersonMap.get(socialPerson.getName().toLowerCase()).getPerson();
+        Person person = getSocialNetworkMap().get(socialPerson.getName().toLowerCase()).getPerson();
 
         for (String memberName : person.getFriends().keySet()) {
             SocialPerson groupPerson = getPerson(memberName);
