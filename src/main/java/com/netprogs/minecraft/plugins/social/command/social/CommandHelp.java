@@ -1,8 +1,8 @@
 package com.netprogs.minecraft.plugins.social.command.social;
 
 import java.util.List;
-import java.util.logging.Logger;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommand;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommandType;
 import com.netprogs.minecraft.plugins.social.command.exception.ArgumentsMissingException;
@@ -12,7 +12,6 @@ import com.netprogs.minecraft.plugins.social.command.exception.SenderNotPlayerEx
 import com.netprogs.minecraft.plugins.social.command.help.HelpBook;
 import com.netprogs.minecraft.plugins.social.command.help.HelpMessage;
 import com.netprogs.minecraft.plugins.social.command.help.HelpSegment;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.ISocialNetworkSettings;
 
@@ -40,8 +39,6 @@ import org.bukkit.command.CommandSender;
 
 public class CommandHelp extends SocialNetworkCommand<ISocialNetworkSettings> {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
     public CommandHelp() {
         super(SocialNetworkCommandType.help);
     }
@@ -66,7 +63,7 @@ public class CommandHelp extends SocialNetworkCommand<ISocialNetworkSettings> {
         }
 
         // now ask the book to display a page for us
-        HelpBook.sendHelpPage(sender, pageNumber);
+        SocialNetworkPlugin.getHelpBook().sendHelpPage(sender, SocialNetworkPlugin.getPluginName(), pageNumber);
 
         // returning false so that we don't so any post-command processing
         return false;
@@ -75,14 +72,12 @@ public class CommandHelp extends SocialNetworkCommand<ISocialNetworkSettings> {
     @Override
     public HelpSegment help() {
 
-        ResourcesConfig config = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
-
-        HelpMessage mainCommand = new HelpMessage();
-        mainCommand.setCommand(getCommandType().toString());
-        mainCommand.setArguments("[1+]");
-        mainCommand.setDescription(config.getResource("social.help"));
-
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
         HelpSegment helpSegment = new HelpSegment(getCommandType());
+
+        HelpMessage mainCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), null, "[1+]",
+                        config.getResource("social.help"));
         helpSegment.addEntry(mainCommand);
 
         return helpSegment;

@@ -1,18 +1,15 @@
 package com.netprogs.minecraft.plugins.social.command;
 
 import java.lang.reflect.ParameterizedType;
-import java.util.List;
-import java.util.logging.Logger;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.command.exception.SenderNotPlayerException;
 import com.netprogs.minecraft.plugins.social.command.group.GroupCommand;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.ISocialNetworkSettings;
 import com.netprogs.minecraft.plugins.social.config.settings.SettingsConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.group.GroupSettings;
 import com.netprogs.minecraft.plugins.social.event.PlayerPermissionGroupChangeEvent;
-import com.netprogs.minecraft.plugins.social.integration.VaultIntegration;
 
 import net.milkbowl.vault.permission.plugins.Permission_PermissionsBukkit;
 
@@ -43,8 +40,6 @@ import org.bukkit.entity.Player;
 
 public abstract class SocialNetworkCommand<T extends ISocialNetworkSettings> implements ISocialNetworkCommand<T> {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
     // The command type is used for command, permissions and resource keys
     private ICommandType commandType;
 
@@ -66,7 +61,7 @@ public abstract class SocialNetworkCommand<T extends ISocialNetworkSettings> imp
 
     @Override
     public boolean hasCommandPermission(CommandSender sender) {
-        return VaultIntegration.getInstance().hasCommandPermission(sender, commandType);
+        return SocialNetworkPlugin.getVault().hasCommandPermission(sender, commandType);
     }
 
     @Override
@@ -83,7 +78,7 @@ public abstract class SocialNetworkCommand<T extends ISocialNetworkSettings> imp
         Class<T> classObject = (Class<T>) genericSuperclass.getActualTypeArguments()[0];
 
         // use that to obtain the settings for this instance
-        SettingsConfig settingsConfig = PluginConfig.getInstance().getConfig(SettingsConfig.class);
+        SettingsConfig settingsConfig = SocialNetworkPlugin.getSettings();
         return (T) settingsConfig.getSocialNetworkSettings(classObject);
     }
 
@@ -109,16 +104,13 @@ public abstract class SocialNetworkCommand<T extends ISocialNetworkSettings> imp
         // down-cast it, we only want to use it for the permission name
         GroupSettings groupSettings = (GroupSettings) getCommandSettings();
 
-        // get the list of current groups the player belongs to
-        List<GroupSettings> personGroupSettings = person.getGroupSettings();
-
         //
         // The Vault::Permission_PermissionsBukkit version of this checks for world to BE NULL.
         //
         // So, for now, pass NULL for world for that Permission implementation. I'll come back to this later.
         //
         String world = player.getWorld().getName();
-        if ((VaultIntegration.getInstance().getPermission() instanceof Permission_PermissionsBukkit)) {
+        if ((SocialNetworkPlugin.getVault().getPermission() instanceof Permission_PermissionsBukkit)) {
             world = null;
         }
 
@@ -128,14 +120,13 @@ public abstract class SocialNetworkCommand<T extends ISocialNetworkSettings> imp
 
             // Check to see if the players groups still contain the one that triggered the event.
             // If it's not in the players social groups, that means we should remove their related permissions group
-            if (!personGroupSettings.contains(groupSettings)) {
+            if (!person.hasGroupSettings(groupSettings)) {
 
-                if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                    logger.info("Removing group: " + player.getName() + ", " + groupSettings.getPermissionsGroup());
-                }
+                SocialNetworkPlugin.log("Removing group: " + player.getName() + ", "
+                        + groupSettings.getPermissionsGroup());
 
                 boolean removed =
-                        VaultIntegration.getInstance().getPermission()
+                        SocialNetworkPlugin.getVault().getPermission()
                                 .playerRemoveGroup(world, player.getName(), groupSettings.getPermissionsGroup());
 
                 if (removed) {
@@ -154,13 +145,12 @@ public abstract class SocialNetworkCommand<T extends ISocialNetworkSettings> imp
                 boolean playerInGroup = playerInPermissionGroup(player.getName(), groupSettings.getPermissionsGroup());
                 if (!playerInGroup) {
 
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("Adding group: " + player.getName() + ", " + groupSettings.getPermissionsGroup());
-                    }
+                    SocialNetworkPlugin.log("Adding group: " + player.getName() + ", "
+                            + groupSettings.getPermissionsGroup());
 
                     // they're not, so lets add them
                     boolean added =
-                            VaultIntegration.getInstance().getPermission()
+                            SocialNetworkPlugin.getVault().getPermission()
                                     .playerAddGroup(world, player.getName(), groupSettings.getPermissionsGroup());
 
                     if (added) {
@@ -175,10 +165,8 @@ public abstract class SocialNetworkCommand<T extends ISocialNetworkSettings> imp
 
                 } else {
 
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("Remaining in group: " + player.getName() + ", "
-                                + groupSettings.getPermissionsGroup());
-                    }
+                    SocialNetworkPlugin.log("Remaining in group: " + player.getName() + ", "
+                            + groupSettings.getPermissionsGroup());
                 }
             }
         }
@@ -187,15 +175,15 @@ public abstract class SocialNetworkCommand<T extends ISocialNetworkSettings> imp
     private boolean playerInPermissionGroup(String playerName, String groupName) {
 
         final String nullString = null;
-        String[] groupList = VaultIntegration.getInstance().getPermission().getPlayerGroups(nullString, playerName);
+        String[] groupList = SocialNetworkPlugin.getVault().getPermission().getPlayerGroups(nullString, playerName);
+
         for (String group : groupList) {
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("playerGroup: " + group);
-            }
+
+            SocialNetworkPlugin.log("playerGroup: " + group);
+
             if (group.equalsIgnoreCase(groupName)) {
-                if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                    logger.info("Matched playerGroup: " + group);
-                }
+
+                SocialNetworkPlugin.log("Matched playerGroup: " + group);
                 return true;
             }
         }

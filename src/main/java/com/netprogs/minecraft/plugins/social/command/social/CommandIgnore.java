@@ -1,8 +1,8 @@
 package com.netprogs.minecraft.plugins.social.command.social;
 
 import java.util.List;
-import java.util.logging.Logger;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommand;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommandType;
@@ -12,14 +12,14 @@ import com.netprogs.minecraft.plugins.social.command.exception.PlayerNotInNetwor
 import com.netprogs.minecraft.plugins.social.command.exception.PlayerNotOnlineException;
 import com.netprogs.minecraft.plugins.social.command.exception.SenderNotInNetworkException;
 import com.netprogs.minecraft.plugins.social.command.exception.SenderNotPlayerException;
+import com.netprogs.minecraft.plugins.social.command.help.HelpBook;
 import com.netprogs.minecraft.plugins.social.command.help.HelpMessage;
 import com.netprogs.minecraft.plugins.social.command.help.HelpSegment;
 import com.netprogs.minecraft.plugins.social.command.util.MessageParameter;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.ISocialNetworkSettings;
-import com.netprogs.minecraft.plugins.social.storage.SocialNetwork;
+import com.netprogs.minecraft.plugins.social.storage.SocialNetworkStorage;
 
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
@@ -47,8 +47,6 @@ import org.bukkit.entity.Player;
 
 public class CommandIgnore extends SocialNetworkCommand<ISocialNetworkSettings> {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
     public CommandIgnore() {
         super(SocialNetworkCommandType.ignore);
     }
@@ -69,7 +67,7 @@ public class CommandIgnore extends SocialNetworkCommand<ISocialNetworkSettings> 
         Player player = (Player) sender;
 
         // get the social network data
-        SocialNetwork socialConfig = SocialNetwork.getInstance();
+        SocialNetworkStorage socialConfig = SocialNetworkPlugin.getStorage();
 
         // check to see if the person is already there, if not, then start to add them
         SocialPerson playerPerson = socialConfig.getPerson(player.getName());
@@ -92,14 +90,14 @@ public class CommandIgnore extends SocialNetworkCommand<ISocialNetworkSettings> 
             String ignorePlayerName = arguments.get(0);
 
             // make sure the player is in the network
-            SocialPerson ignorePerson = SocialNetwork.getInstance().getPerson(ignorePlayerName);
+            SocialPerson ignorePerson = SocialNetworkPlugin.getStorage().getPerson(ignorePlayerName);
             if (ignorePerson == null) {
                 throw new PlayerNotInNetworkException(ignorePlayerName);
             }
 
             // add them to the ignore list
-            playerPerson.addIgnore(ignorePerson.getName());
-            SocialNetwork.getInstance().savePerson(playerPerson);
+            playerPerson.addIgnore(ignorePerson);
+            SocialNetworkPlugin.getStorage().savePerson(playerPerson);
 
             // tell them they've added the person
             MessageUtil.sendMessage(player, "social.ignore.add.completed.sender", ChatColor.GREEN,
@@ -125,14 +123,14 @@ public class CommandIgnore extends SocialNetworkCommand<ISocialNetworkSettings> 
                 String ignorePersonName = arguments.get(1);
 
                 // make sure the player is in the network
-                SocialPerson ignorePerson = SocialNetwork.getInstance().getPerson(ignorePersonName);
+                SocialPerson ignorePerson = SocialNetworkPlugin.getStorage().getPerson(ignorePersonName);
                 if (ignorePerson == null) {
                     throw new PlayerNotInNetworkException(ignorePersonName);
                 }
 
                 // remove them from the ignore list
-                playerPerson.removeIgnore(ignorePerson.getName());
-                SocialNetwork.getInstance().savePerson(playerPerson);
+                playerPerson.removeIgnore(ignorePerson);
+                SocialNetworkPlugin.getStorage().savePerson(playerPerson);
 
                 // tell them they've removed the person
                 MessageUtil.sendMessage(player, "social.ignore.remove.completed.sender", ChatColor.GREEN,
@@ -165,26 +163,22 @@ public class CommandIgnore extends SocialNetworkCommand<ISocialNetworkSettings> 
     @Override
     public HelpSegment help() {
 
-        ResourcesConfig config = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
-
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
         HelpSegment helpSegment = new HelpSegment(getCommandType());
 
-        HelpMessage mainCommand = new HelpMessage();
-        mainCommand.setCommand(getCommandType().toString());
-        mainCommand.setArguments("<player>");
-        mainCommand.setDescription(config.getResource("social.ignore.help"));
+        HelpMessage mainCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), null, "<player>",
+                        config.getResource("social.ignore.help"));
         helpSegment.addEntry(mainCommand);
 
-        HelpMessage removeCommand = new HelpMessage();
-        removeCommand.setCommand(getCommandType().toString());
-        removeCommand.setArguments("remove <player>");
-        removeCommand.setDescription(config.getResource("social.ignore.help.remove"));
+        HelpMessage removeCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "remove", "<player>",
+                        config.getResource("social.ignore.help.remove"));
         helpSegment.addEntry(removeCommand);
 
-        HelpMessage listCommand = new HelpMessage();
-        listCommand.setCommand(getCommandType().toString());
-        listCommand.setArguments("list");
-        listCommand.setDescription(config.getResource("social.ignore.help.list"));
+        HelpMessage listCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "list", null,
+                        config.getResource("social.ignore.help.list"));
         helpSegment.addEntry(listCommand);
 
         return helpSegment;

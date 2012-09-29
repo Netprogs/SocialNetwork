@@ -1,4 +1,4 @@
-package com.netprogs.minecraft.plugins.social.config;
+package com.netprogs.minecraft.plugins.social.io;
 
 /*
  * "Social Network" is a Craftbukkit Minecraft server modification plug-in. It attempts to add a 

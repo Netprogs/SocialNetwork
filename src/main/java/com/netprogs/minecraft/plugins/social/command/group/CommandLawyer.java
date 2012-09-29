@@ -2,8 +2,8 @@ package com.netprogs.minecraft.plugins.social.command.group;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.SocialPerson.Status;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommand;
@@ -13,16 +13,13 @@ import com.netprogs.minecraft.plugins.social.command.exception.InvalidPermission
 import com.netprogs.minecraft.plugins.social.command.exception.PlayerNotInNetworkException;
 import com.netprogs.minecraft.plugins.social.command.exception.PlayerNotOnlineException;
 import com.netprogs.minecraft.plugins.social.command.exception.SenderNotPlayerException;
+import com.netprogs.minecraft.plugins.social.command.help.HelpBook;
 import com.netprogs.minecraft.plugins.social.command.help.HelpMessage;
 import com.netprogs.minecraft.plugins.social.command.help.HelpSegment;
 import com.netprogs.minecraft.plugins.social.command.util.MessageParameter;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.command.util.TimerUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.group.LawyerSettings;
-import com.netprogs.minecraft.plugins.social.integration.VaultIntegration;
-import com.netprogs.minecraft.plugins.social.storage.SocialNetwork;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -51,8 +48,6 @@ import org.bukkit.entity.Player;
 
 public class CommandLawyer extends SocialNetworkCommand<LawyerSettings> {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
     public CommandLawyer() {
         super(SocialNetworkCommandType.lawyer);
     }
@@ -73,7 +68,7 @@ public class CommandLawyer extends SocialNetworkCommand<LawyerSettings> {
 
             // since we have a player, if the command wasn't handled, let's check to make sure they're a priest
             if (!commandHandled) {
-                SocialPerson playerPerson = SocialNetwork.getInstance().getPerson(player.getName());
+                SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(player.getName());
                 if (playerPerson != null && !playerPerson.isPriest()) {
 
                     // If they didn't have priest assigned to them, check the permissions to see if they have it there
@@ -96,7 +91,7 @@ public class CommandLawyer extends SocialNetworkCommand<LawyerSettings> {
             if (sender instanceof Player) {
 
                 Player player = (Player) sender;
-                SocialPerson playerPerson = SocialNetwork.getInstance().getPerson(player.getName());
+                SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(player.getName());
 
                 // since we have a player, let's check to make sure they're a lawyer
                 if (playerPerson != null && !playerPerson.isLawyer()) {
@@ -113,14 +108,14 @@ public class CommandLawyer extends SocialNetworkCommand<LawyerSettings> {
 
             // make sure the A player is in the network
             String aPlayerName = arguments.get(0);
-            SocialPerson aPlayerPerson = SocialNetwork.getInstance().getPerson(aPlayerName);
+            SocialPerson aPlayerPerson = SocialNetworkPlugin.getStorage().getPerson(aPlayerName);
             if (aPlayerPerson == null) {
                 throw new PlayerNotInNetworkException(aPlayerName);
             }
 
             // make sure the B player is in the network
             String bPlayerName = arguments.get(1);
-            SocialPerson bPlayerPerson = SocialNetwork.getInstance().getPerson(bPlayerName);
+            SocialPerson bPlayerPerson = SocialNetworkPlugin.getStorage().getPerson(bPlayerName);
             if (bPlayerPerson == null) {
                 throw new PlayerNotInNetworkException(bPlayerName);
             }
@@ -133,8 +128,8 @@ public class CommandLawyer extends SocialNetworkCommand<LawyerSettings> {
                 // check to see if the couple can afford this request
                 double price = settings.getPerUseCost();
                 boolean authorized = true;
-                authorized &= VaultIntegration.getInstance().preAuthCommandPurchase(aPlayer, price);
-                authorized &= VaultIntegration.getInstance().preAuthCommandPurchase(bPlayer, price);
+                authorized &= SocialNetworkPlugin.getVault().preAuthCommandPurchase(aPlayer, price);
+                authorized &= SocialNetworkPlugin.getVault().preAuthCommandPurchase(bPlayer, price);
                 if (!authorized) {
                     MessageUtil.sendMessage(sender, "social.lawyer.request.coupleCannotAfford.sender", ChatColor.GOLD);
                     return false;
@@ -143,7 +138,9 @@ public class CommandLawyer extends SocialNetworkCommand<LawyerSettings> {
                 // Married couples remain on a "honeymoon" phase for a period of time.
                 // During this time they're not allowed to get divorced. Check for that now.
                 long timeRemaining =
-                        TimerUtil.commandOnTimer(aPlayerPerson.getName(), SocialNetworkCommandType.marriage);
+                        SocialNetworkPlugin.getTimerManager().commandOnTimer(aPlayerPerson.getName(),
+                                SocialNetworkCommandType.marriage);
+
                 if (timeRemaining > 0) {
 
                     // tell the user how much time remains
@@ -171,8 +168,8 @@ public class CommandLawyer extends SocialNetworkCommand<LawyerSettings> {
                 }
 
                 // create and set the divorce to the playerPerson
-                aPlayerPerson.createDivorce(bPlayerPerson.getName());
-                bPlayerPerson.createDivorce(aPlayerPerson.getName());
+                aPlayerPerson.createDivorce(bPlayerPerson);
+                bPlayerPerson.createDivorce(aPlayerPerson);
 
                 // remove their marriage
                 aPlayerPerson.breakMarriage();
@@ -183,8 +180,8 @@ public class CommandLawyer extends SocialNetworkCommand<LawyerSettings> {
                 bPlayerPerson.setSocialStatus(Status.divorced);
 
                 // save the changes to disk
-                SocialNetwork.getInstance().savePerson(aPlayerPerson);
-                SocialNetwork.getInstance().savePerson(bPlayerPerson);
+                SocialNetworkPlugin.getStorage().savePerson(aPlayerPerson);
+                SocialNetworkPlugin.getStorage().savePerson(bPlayerPerson);
 
                 // check for a permissions update
                 checkForPermissionsUpdate(aPlayerPerson);
@@ -192,12 +189,16 @@ public class CommandLawyer extends SocialNetworkCommand<LawyerSettings> {
 
                 // update the timer for the divorce
                 int timer = settings.getBitternessPeriod();
-                TimerUtil.updateCommandTimer(aPlayerPerson.getName(), SocialNetworkCommandType.divorce, timer);
-                TimerUtil.updateCommandTimer(bPlayerPerson.getName(), SocialNetworkCommandType.divorce, timer);
+
+                SocialNetworkPlugin.getTimerManager().updateCommandTimer(aPlayerPerson.getName(),
+                        SocialNetworkCommandType.divorce, timer);
+
+                SocialNetworkPlugin.getTimerManager().updateCommandTimer(bPlayerPerson.getName(),
+                        SocialNetworkCommandType.divorce, timer);
 
                 // now charge for our services
-                VaultIntegration.getInstance().processCommandPurchase(aPlayer, settings.getPerUseCost());
-                VaultIntegration.getInstance().processCommandPurchase(bPlayer, settings.getPerUseCost());
+                SocialNetworkPlugin.getVault().processCommandPurchase(aPlayer, settings.getPerUseCost());
+                SocialNetworkPlugin.getVault().processCommandPurchase(bPlayer, settings.getPerUseCost());
 
                 // send messages to the players
                 MessageUtil.sendMessage(aPlayer, "social.lawyer.completed.player", ChatColor.GREEN,
@@ -243,7 +244,7 @@ public class CommandLawyer extends SocialNetworkCommand<LawyerSettings> {
         if (arguments.size() == 1) {
 
             // we only want to run this if the player is in the network
-            SocialPerson playerPerson = SocialNetwork.getInstance().getPerson(player.getName());
+            SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(player.getName());
             if (playerPerson != null) {
 
                 if (arguments.get(0).equals("list")) {
@@ -252,20 +253,16 @@ public class CommandLawyer extends SocialNetworkCommand<LawyerSettings> {
                     MessageUtil.sendHeaderMessage(player, "social.admin.lawyer.list.header.sender");
 
                     // check to see if they have anyone
-                    List<String> lawyerPlayers = SocialNetwork.getInstance().getLawyers();
+                    List<String> lawyerPlayers = SocialNetworkPlugin.getStorage().getLawyers();
                     if (lawyerPlayers.size() == 0) {
 
                         MessageUtil.sendMessage(player, "social.lawyer.list.noPeople.sender", ChatColor.GREEN);
 
                     } else {
 
-                        String onlineTag =
-                                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                                        .getResource("social.list.tag.online.sender");
-
-                        String offlineTag =
-                                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                                        .getResource("social.list.tag.offline.sender");
+                        ResourcesConfig config = SocialNetworkPlugin.getResources();
+                        String onlineTag = config.getResource("social.list.tag.online.sender");
+                        String offlineTag = config.getResource("social.list.tag.offline.sender");
 
                         String onlineList = ChatColor.GREEN + onlineTag + " " + ChatColor.WHITE;
                         String offlineList = ChatColor.GRAY + offlineTag + " " + ChatColor.WHITE;
@@ -305,30 +302,26 @@ public class CommandLawyer extends SocialNetworkCommand<LawyerSettings> {
     public HelpSegment help() {
 
         HelpSegment helpSegment = new HelpSegment(getCommandType());
-        ResourcesConfig config = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
 
-        HelpMessage mainCommand = new HelpMessage();
-        mainCommand.setCommand(getCommandType().toString());
-        mainCommand.setArguments("<playerA> <playerB>");
-        mainCommand.setDescription(config.getResource("social.lawyer.help.request"));
+        HelpMessage mainCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "request", "<playerA> <playerB>",
+                        config.getResource("social.lawyer.help.request"));
         helpSegment.addEntry(mainCommand);
 
-        HelpMessage listCommand = new HelpMessage();
-        listCommand.setCommand(getCommandType().toString());
-        listCommand.setArguments("list");
-        listCommand.setDescription(config.getResource("social.lawyer.help.list"));
+        HelpMessage listCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "list", null,
+                        config.getResource("social.lawyer.help.list"));
         helpSegment.addEntry(listCommand);
 
-        HelpMessage acceptCommand = new HelpMessage();
-        acceptCommand.setCommand(getCommandType().toString());
-        acceptCommand.setArguments("accept");
-        acceptCommand.setDescription(config.getResource("social.lawyer.help.accept"));
+        HelpMessage acceptCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "accept", null,
+                        config.getResource("social.lawyer.help.accept"));
         helpSegment.addEntry(acceptCommand);
 
-        HelpMessage rejectCommand = new HelpMessage();
-        rejectCommand.setCommand(getCommandType().toString());
-        rejectCommand.setArguments("reject");
-        rejectCommand.setDescription(config.getResource("social.lawyer.help.reject"));
+        HelpMessage rejectCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "reject", null,
+                        config.getResource("social.lawyer.help.reject"));
         helpSegment.addEntry(rejectCommand);
 
         return helpSegment;

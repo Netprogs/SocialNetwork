@@ -1,16 +1,14 @@
 package com.netprogs.minecraft.plugins.social.perk;
 
 import java.lang.reflect.ParameterizedType;
-import java.util.List;
+import java.util.Iterator;
 import java.util.Map;
-import java.util.logging.Logger;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.SettingsConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.group.GroupSettings;
 import com.netprogs.minecraft.plugins.social.config.settings.perk.IPerkSettings;
-import com.netprogs.minecraft.plugins.social.storage.SocialNetwork;
 import com.netprogs.minecraft.plugins.social.storage.data.perk.IPersonPerkSettings;
 
 /*
@@ -34,8 +32,6 @@ import com.netprogs.minecraft.plugins.social.storage.data.perk.IPersonPerkSettin
  */
 
 public abstract class PerkBase<S extends IPerkSettings, P extends IPersonPerkSettings> {
-
-    private final Logger logger = Logger.getLogger("Minecraft");
 
     @SuppressWarnings("unchecked")
     protected Class<S> getPerkSettingsClassBase() {
@@ -65,39 +61,28 @@ public abstract class PerkBase<S extends IPerkSettings, P extends IPersonPerkSet
         //
 
         // get the settings
-        SettingsConfig settingsConfig = PluginConfig.getInstance().getConfig(SettingsConfig.class);
-
-        // get the list of group settings the person belongs to
-        List<GroupSettings> personGroupSettings = person.getGroupSettings();
+        SettingsConfig settingsConfig = SocialNetworkPlugin.getSettings();
 
         // get the settings class for this perk from the generic template
         Class<S> classObject = (Class<S>) getPerkSettingsClassBase();
 
-        if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-            logger.info("------------------------ getPerkSettings() START ---------------------");
-        }
+        SocialNetworkPlugin.log("--- getPerkSettings() START ---");
 
         // use that to lookup our settings instance list for this perk
         Map<String, ? extends IPerkSettings> perkSettingsMap = settingsConfig.getPerkSettingsMap(classObject);
         if (perkSettingsMap != null) {
 
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                for (GroupSettings groupSettings : settingsConfig.getSocialNetworkGroupSettings()) {
-                    logger.info("groupSettings: " + groupSettings.getClass().getSimpleName());
-                }
-            }
-
             // The social network group settings list has been sorted by priority as defined in the configuration file.
             // Let's check each one in order against the list of what the user currently belongs to.
-            for (GroupSettings groupSettings : settingsConfig.getSocialNetworkGroupSettings()) {
+            Iterator<GroupSettings> groupSettingsIterator = settingsConfig.getSocialNetworkGroupSettings();
+            while (groupSettingsIterator.hasNext()) {
+                GroupSettings groupSettings = groupSettingsIterator.next();
 
-                if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                    logger.info("Checking player: " + person.getName() + " for groupSettings: "
-                            + groupSettings.getClass().getSimpleName());
-                }
+                SocialNetworkPlugin.log("Checking player: " + person.getName() + " for groupSettings: "
+                        + groupSettings.getClass().getSimpleName());
 
-                // check each of the persons current groups to see if we have one
-                if (personGroupSettings.contains(groupSettings)) {
+                // check the persons current groups to see if we have one that matches this group
+                if (person.hasGroupSettings(groupSettings)) {
 
                     // Now we have a settings group from the configuration, in the correct priority level, let's
                     // check to see which perks it contains.
@@ -111,39 +96,32 @@ public abstract class PerkBase<S extends IPerkSettings, P extends IPersonPerkSet
 
                             IPerkSettings perkSettings = perkSettingsMap.get(perkName);
 
-                            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                                logger.info("Player: " + person.getName() + " has groupSettings: "
-                                        + groupSettings.getClass().getSimpleName() + " with perk: "
-                                        + perkSettings.getName());
-                            }
+                            SocialNetworkPlugin.log("Player: " + person.getName() + " has groupSettings: "
+                                    + groupSettings.getClass().getSimpleName() + " with perk: "
+                                    + perkSettings.getName());
 
                             // check to see if the member also has this perk by checking all their groups
                             // (could end up matching this same group, but that is fine)
                             if (member != null) {
 
-                                if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                                    logger.info("Checking to see if member " + member.getName() + " belongs to any of "
-                                            + person.getName() + " groups with a perk: " + perkSettings.getName());
-                                }
+                                SocialNetworkPlugin.log("Checking to see if member " + member.getName()
+                                        + " belongs to any of " + person.getName() + " groups with a perk: "
+                                        + perkSettings.getName());
 
-                                if (person.isPerkMember(perkSettings, member)) {
+                                if (person.hasGroupMemberWithPerk(member, perkSettings)) {
 
-                                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
+                                    SocialNetworkPlugin.log("Match found. Using perk settings: "
+                                            + perkSettings.getName() + " found in group: "
+                                            + groupSettings.getClass().getSimpleName());
 
-                                        logger.info("Match found. Using perk settings: " + perkSettings.getName()
-                                                + " found in group: " + groupSettings.getClass().getSimpleName());
-
-                                        logger.info("------------------------ getPerkSettings() END ---------------------");
-                                    }
+                                    SocialNetworkPlugin.log("--- getPerkSettings() END ---");
 
                                     return classObject.cast(perkSettings);
                                 }
 
                             } else {
 
-                                if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                                    logger.info("------------------------ getPerkSettings() END ---------------------");
-                                }
+                                SocialNetworkPlugin.log("--- getPerkSettings() END ---");
 
                                 // No member was given, so let's just return the one we found
                                 // This would be used for cases where the perk only needs a config for the executing
@@ -155,17 +133,13 @@ public abstract class PerkBase<S extends IPerkSettings, P extends IPersonPerkSet
 
                 } else {
 
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("Player: " + person.getName() + " does NOT have groupSettings: "
-                                + groupSettings.getClass().getSimpleName());
-                    }
+                    SocialNetworkPlugin.log("Player: " + person.getName() + " does NOT have groupSettings: "
+                            + groupSettings.getClass().getSimpleName());
                 }
             }
         }
 
-        if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-            logger.info("------------------------ getPerkSettings() END: NO MATCH ---------------------");
-        }
+        SocialNetworkPlugin.log("--- getPerkSettings() END: NO MATCH ---");
 
         // we'll return null if nothing at all is found
         return null;
@@ -176,7 +150,7 @@ public abstract class PerkBase<S extends IPerkSettings, P extends IPersonPerkSet
 
         // request their settings for this perk from the SocialNetwork data controller
         P settings =
-                SocialNetwork.getInstance().getPersonPerkSettings(person.getName(),
+                SocialNetworkPlugin.getStorage().getPersonPerkSettings(person,
                         getPerkSettingsClassBase().getSimpleName());
 
         if (settings == null) {
@@ -201,7 +175,7 @@ public abstract class PerkBase<S extends IPerkSettings, P extends IPersonPerkSet
     protected <U extends IPersonPerkSettings> void savePersonPerkSettingsBase(SocialPerson person, U perkSettings) {
 
         // ask the SocialNetwork data controller to save the settings
-        SocialNetwork.getInstance().setPersonPerkSettings(person.getName(), getPerkSettingsClassBase().getSimpleName(),
+        SocialNetworkPlugin.getStorage().setPersonPerkSettings(person, getPerkSettingsClassBase().getSimpleName(),
                 perkSettings);
     }
 }

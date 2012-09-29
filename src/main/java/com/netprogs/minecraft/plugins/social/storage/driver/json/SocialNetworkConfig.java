@@ -1,6 +1,6 @@
 package com.netprogs.minecraft.plugins.social.storage.driver.json;
 
-import com.netprogs.minecraft.plugins.social.config.JsonConfiguration;
+import com.netprogs.minecraft.plugins.social.io.JsonConfiguration;
 import com.netprogs.minecraft.plugins.social.storage.data.Network;
 
 /*

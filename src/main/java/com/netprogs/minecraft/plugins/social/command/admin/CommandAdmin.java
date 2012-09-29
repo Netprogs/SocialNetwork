@@ -1,9 +1,10 @@
 package com.netprogs.minecraft.plugins.social.command.admin;
 
 import java.util.List;
-import java.util.logging.Logger;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
+import com.netprogs.minecraft.plugins.social.SocialPerson.WaitState;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommand;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommandType;
 import com.netprogs.minecraft.plugins.social.command.exception.ArgumentsMissingException;
@@ -15,10 +16,8 @@ import com.netprogs.minecraft.plugins.social.command.help.HelpMessage;
 import com.netprogs.minecraft.plugins.social.command.help.HelpSegment;
 import com.netprogs.minecraft.plugins.social.command.util.MessageParameter;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.ISocialNetworkSettings;
-import com.netprogs.minecraft.plugins.social.storage.SocialNetwork;
 
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
@@ -44,8 +43,6 @@ import org.bukkit.command.CommandSender;
  */
 
 public class CommandAdmin extends SocialNetworkCommand<ISocialNetworkSettings> {
-
-    private final Logger logger = Logger.getLogger("Minecraft");
 
     public CommandAdmin() {
         super(SocialNetworkCommandType.admin);
@@ -77,15 +74,157 @@ public class CommandAdmin extends SocialNetworkCommand<ISocialNetworkSettings> {
         } else if (command.equals("lawyer")) {
 
             handleLawyer(sender, arguments);
+
+        } else if (command.equals("purge")) {
+
+            handlePurge(sender, arguments);
+
+        } else if (command.equals("clear")) {
+
+            handleClear(sender, arguments);
+
+        } else if (command.equals("remove")) {
+
+            handleRemove(sender, arguments);
+
+        } else if (command.equals("reload")) {
+
+            handleReload(sender, arguments);
+
+        } else if (command.equals("gender")) {
+
+            handleGender(sender, arguments);
         }
 
         return true;
     }
 
+    private void handlePurge(CommandSender sender, List<String> arguments) throws ArgumentsMissingException,
+            PlayerNotInNetworkException {
+
+        if (arguments.size() != 1) {
+            throw new ArgumentsMissingException();
+        }
+
+        int purgeDays = 0;
+        if (arguments.size() > 0) {
+
+            try {
+                purgeDays = Integer.valueOf(Integer.parseInt(arguments.get(0)));
+            } catch (Exception e) {
+                // don't bother reporting it, just assume page 1
+            }
+        }
+
+        if (purgeDays > 0) {
+
+            // get the list of all players
+            int purgeCount = SocialNetworkPlugin.getStorage().purgePlayers(purgeDays);
+
+            // tell them it's done
+            MessageUtil.sendMessage(sender, "social.admin.purge.completed.sender", ChatColor.GREEN,
+                    new MessageParameter("<count>", Integer.toString(purgeCount), ChatColor.AQUA));
+        }
+    }
+
+    private void handleGender(CommandSender sender, List<String> arguments) throws ArgumentsMissingException,
+            PlayerNotInNetworkException {
+
+        if (arguments.size() != 2) {
+            throw new ArgumentsMissingException();
+        }
+
+        // check to see if the requested person is in the network
+        String playerName = arguments.get(0);
+        SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(playerName);
+        if (playerPerson == null) {
+            throw new PlayerNotInNetworkException(playerName);
+        }
+
+        String playerGender = arguments.get(1);
+        if (!SocialPerson.Gender.male.toString().equalsIgnoreCase(playerGender)
+                && !SocialPerson.Gender.female.toString().equalsIgnoreCase(playerGender)) {
+
+            MessageUtil.sendMessage(sender, "social.admin.gender.invalid.sender", ChatColor.RED);
+            return;
+        }
+
+        // change their gender
+        SocialPerson.Gender gender = SocialPerson.Gender.valueOf(playerGender);
+        playerPerson.setGender(gender);
+        SocialNetworkPlugin.getStorage().savePerson(playerPerson);
+
+        // tell the admin they got updated
+        MessageUtil.sendMessage(sender, "social.admin.gender.completed.sender", ChatColor.GREEN);
+    }
+
+    private void handleClear(CommandSender sender, List<String> arguments) throws ArgumentsMissingException,
+            PlayerNotInNetworkException {
+
+        if (arguments.size() != 1) {
+            throw new ArgumentsMissingException();
+        }
+
+        // check to see if the requested person is in the network
+        String playerName = arguments.get(0);
+        SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(playerName);
+        if (playerPerson == null) {
+            throw new PlayerNotInNetworkException(playerName);
+        }
+
+        // remove their timers
+        SocialNetworkPlugin.getTimerManager().removeTimers(playerPerson.getName());
+
+        // remove their wait command
+        playerPerson.waitOn(WaitState.notWaiting, null);
+        SocialNetworkPlugin.getStorage().savePerson(playerPerson);
+
+        // tell the admin they got reset
+        MessageUtil.sendMessage(sender, "social.admin.clear.completed.sender", ChatColor.GREEN);
+    }
+
+    private void handleRemove(CommandSender sender, List<String> arguments) throws ArgumentsMissingException,
+            PlayerNotInNetworkException {
+
+        if (arguments.size() != 0) {
+            throw new ArgumentsMissingException();
+        }
+
+        // check to see if the requested person is in the network
+        String playerName = arguments.get(0);
+        SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(playerName);
+        if (playerPerson == null) {
+            throw new PlayerNotInNetworkException(playerName);
+        }
+
+        // remove their timers
+        SocialNetworkPlugin.getTimerManager().removeTimers(playerPerson.getName());
+
+        // remove their wait command
+        playerPerson.waitOn(WaitState.notWaiting, null);
+
+        // remove the person from the network
+        SocialNetworkPlugin.getStorage().removePerson(playerPerson);
+
+        // tell the admin they got reset
+        MessageUtil.sendMessage(sender, "social.admin.remove.completed.sender", ChatColor.GREEN);
+    }
+
+    private void handleReload(CommandSender sender, List<String> arguments) throws ArgumentsMissingException,
+            PlayerNotInNetworkException {
+
+        // reload the configurations
+        SocialNetworkPlugin.getSettings().reloadConfig();
+        SocialNetworkPlugin.getResources().reloadConfig();
+
+        // tell the admin they got reset
+        MessageUtil.sendMessage(sender, "social.admin.reload.completed.sender", ChatColor.GREEN);
+    }
+
     private void handlePriest(CommandSender sender, List<String> arguments) throws ArgumentsMissingException,
             PlayerNotInNetworkException {
 
-        if (arguments.size() == 0) {
+        if (arguments.size() != 1) {
             throw new ArgumentsMissingException();
         }
 
@@ -95,7 +234,7 @@ public class CommandAdmin extends SocialNetworkCommand<ISocialNetworkSettings> {
             MessageUtil.sendHeaderMessage(sender, "social.admin.priest.list.header.sender");
 
             // send a response for each person with their message count
-            List<String> priestPlayers = SocialNetwork.getInstance().getPriests();
+            List<String> priestPlayers = SocialNetworkPlugin.getStorage().getPriests();
             for (String playerName : priestPlayers) {
                 sender.sendMessage(playerName);
             }
@@ -110,17 +249,17 @@ public class CommandAdmin extends SocialNetworkCommand<ISocialNetworkSettings> {
 
             // check to see if the requested person is in the network
             String playerName = arguments.get(0);
-            SocialPerson playerPerson = SocialNetwork.getInstance().getPerson(playerName);
+            SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(playerName);
             if (playerPerson == null) {
                 throw new PlayerNotInNetworkException(playerName);
             }
 
             // check to see if they're already a priest
-            if (SocialNetwork.getInstance().hasPriest(playerPerson.getName())) {
+            if (SocialNetworkPlugin.getStorage().hasPriest(playerPerson)) {
 
                 // toggle them off
                 playerPerson.setPriest(false);
-                SocialNetwork.getInstance().removePriest(playerPerson.getName());
+                SocialNetworkPlugin.getStorage().removePriest(playerPerson);
 
                 // tell the admin they got switched
                 MessageUtil.sendMessage(sender, "social.admin.priest.remove.completed.sender", ChatColor.GREEN,
@@ -130,7 +269,7 @@ public class CommandAdmin extends SocialNetworkCommand<ISocialNetworkSettings> {
 
                 // toggle them on
                 playerPerson.setPriest(true);
-                SocialNetwork.getInstance().addPriest(playerPerson.getName());
+                SocialNetworkPlugin.getStorage().addPriest(playerPerson);
 
                 // tell the admin they got switched
                 MessageUtil.sendMessage(sender, "social.admin.priest.add.completed.sender", ChatColor.GREEN,
@@ -138,14 +277,14 @@ public class CommandAdmin extends SocialNetworkCommand<ISocialNetworkSettings> {
             }
 
             // save the changes
-            SocialNetwork.getInstance().savePerson(playerPerson);
+            SocialNetworkPlugin.getStorage().savePerson(playerPerson);
         }
     }
 
     private void handleLawyer(CommandSender sender, List<String> arguments) throws ArgumentsMissingException,
             PlayerNotInNetworkException {
 
-        if (arguments.size() == 0) {
+        if (arguments.size() != 1) {
             throw new ArgumentsMissingException();
         }
 
@@ -155,7 +294,7 @@ public class CommandAdmin extends SocialNetworkCommand<ISocialNetworkSettings> {
             MessageUtil.sendHeaderMessage(sender, "social.admin.lawyer.list.header.sender");
 
             // send a response for each person with their message count
-            List<String> lawyerPlayers = SocialNetwork.getInstance().getLawyers();
+            List<String> lawyerPlayers = SocialNetworkPlugin.getStorage().getLawyers();
             for (String playerName : lawyerPlayers) {
                 sender.sendMessage(playerName);
             }
@@ -170,17 +309,17 @@ public class CommandAdmin extends SocialNetworkCommand<ISocialNetworkSettings> {
 
             // check to see if the requested person is in the network
             String playerName = arguments.get(0);
-            SocialPerson playerPerson = SocialNetwork.getInstance().getPerson(playerName);
+            SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(playerName);
             if (playerPerson == null) {
                 throw new PlayerNotInNetworkException(playerName);
             }
 
             // check to see if they're already a lawyer
-            if (SocialNetwork.getInstance().hasLawyer(playerPerson.getName())) {
+            if (SocialNetworkPlugin.getStorage().hasLawyer(playerPerson)) {
 
                 // toggle them off
                 playerPerson.setLawyer(false);
-                SocialNetwork.getInstance().removeLawyer(playerPerson.getName());
+                SocialNetworkPlugin.getStorage().removeLawyer(playerPerson);
 
                 // tell the admin they got switched
                 MessageUtil.sendMessage(sender, "social.admin.lawyer.remove.completed.sender", ChatColor.GREEN,
@@ -190,7 +329,7 @@ public class CommandAdmin extends SocialNetworkCommand<ISocialNetworkSettings> {
 
                 // toggle them on
                 playerPerson.setLawyer(true);
-                SocialNetwork.getInstance().addLawyer(playerPerson.getName());
+                SocialNetworkPlugin.getStorage().addLawyer(playerPerson);
 
                 // tell the admin they got switched
                 MessageUtil.sendMessage(sender, "social.admin.lawyer.add.completed.sender", ChatColor.GREEN,
@@ -198,21 +337,15 @@ public class CommandAdmin extends SocialNetworkCommand<ISocialNetworkSettings> {
             }
 
             // save the changes
-            SocialNetwork.getInstance().savePerson(playerPerson);
+            SocialNetworkPlugin.getStorage().savePerson(playerPerson);
         }
     }
-
-    // "social.admin.priest.help.toggle": "Toggles the priest status for player.",
-    // "social.admin.priest.help.list": "Lists current priests.",
-
-    // "social.admin.priest.help.toggle": "Toggles the priest status for player.",
-    // "social.admin.priest.help.list": "Lists current priests.",
 
     @Override
     public HelpSegment help() {
 
         HelpSegment helpSegment = new HelpSegment(getCommandType());
-        ResourcesConfig config = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
 
         HelpMessage priestCommand = new HelpMessage();
         priestCommand.setCommand(getCommandType().toString());
@@ -237,6 +370,36 @@ public class CommandAdmin extends SocialNetworkCommand<ISocialNetworkSettings> {
         lawyerListCommand.setArguments("lawyer list");
         lawyerListCommand.setDescription(config.getResource("social.admin.lawyer.help.list"));
         helpSegment.addEntry(lawyerListCommand);
+
+        HelpMessage genderListCommand = new HelpMessage();
+        genderListCommand.setCommand(getCommandType().toString());
+        genderListCommand.setArguments("gender <player> <male|female>");
+        genderListCommand.setDescription(config.getResource("social.admin.gender.help"));
+        helpSegment.addEntry(genderListCommand);
+
+        HelpMessage clearTimerListCommand = new HelpMessage();
+        clearTimerListCommand.setCommand(getCommandType().toString());
+        clearTimerListCommand.setArguments("clear <player>");
+        clearTimerListCommand.setDescription(config.getResource("social.admin.clear.help"));
+        helpSegment.addEntry(clearTimerListCommand);
+
+        HelpMessage removeListCommand = new HelpMessage();
+        removeListCommand.setCommand(getCommandType().toString());
+        removeListCommand.setArguments("remove <player>");
+        removeListCommand.setDescription(config.getResource("social.admin.remove.help"));
+        helpSegment.addEntry(removeListCommand);
+
+        HelpMessage reloadCommand = new HelpMessage();
+        reloadCommand.setCommand(getCommandType().toString());
+        reloadCommand.setArguments("reload");
+        reloadCommand.setDescription(config.getResource("social.admin.reload.help"));
+        helpSegment.addEntry(reloadCommand);
+
+        HelpMessage purgeCommand = new HelpMessage();
+        purgeCommand.setCommand(getCommandType().toString());
+        purgeCommand.setArguments("purge <days>");
+        purgeCommand.setDescription(config.getResource("social.admin.purge.help"));
+        helpSegment.addEntry(purgeCommand);
 
         return helpSegment;
     }

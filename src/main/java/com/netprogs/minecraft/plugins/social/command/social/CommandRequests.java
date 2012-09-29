@@ -2,8 +2,9 @@ package com.netprogs.minecraft.plugins.social.command.social;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
+import java.util.Map;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommand;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommandType;
@@ -11,15 +12,16 @@ import com.netprogs.minecraft.plugins.social.command.exception.ArgumentsMissingE
 import com.netprogs.minecraft.plugins.social.command.exception.InvalidPermissionsException;
 import com.netprogs.minecraft.plugins.social.command.exception.SenderNotInNetworkException;
 import com.netprogs.minecraft.plugins.social.command.exception.SenderNotPlayerException;
+import com.netprogs.minecraft.plugins.social.command.help.HelpBook;
 import com.netprogs.minecraft.plugins.social.command.help.HelpMessage;
 import com.netprogs.minecraft.plugins.social.command.help.HelpSegment;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.ISocialNetworkSettings;
-import com.netprogs.minecraft.plugins.social.storage.SocialNetwork;
+import com.netprogs.minecraft.plugins.social.storage.SocialNetworkStorage;
 import com.netprogs.minecraft.plugins.social.storage.data.Request;
 
+import org.apache.commons.lang.StringUtils;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -46,7 +48,53 @@ import org.bukkit.entity.Player;
 
 public class CommandRequests extends SocialNetworkCommand<ISocialNetworkSettings> {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
+    private class RequestsView {
+
+        private String requestTag;
+        private List<String> playerNames = new ArrayList<String>();
+
+        public RequestsView(String requestTag) {
+
+            this.requestTag = requestTag;
+        }
+
+        public void addPlayer(String playerName) {
+            playerNames.add(playerName);
+        }
+
+        public String toString() {
+
+            StringBuffer stringBuffer = new StringBuffer();
+
+            if (playerNames.size() > 0) {
+
+                stringBuffer.append(ChatColor.AQUA);
+                stringBuffer.append(requestTag);
+                stringBuffer.append(": ");
+
+                String firstPlayerName = playerNames.remove(0);
+                stringBuffer.append(getPlayerNameDisplay(firstPlayerName));
+
+                for (String playerName : playerNames) {
+                    stringBuffer.append(", ");
+                    stringBuffer.append(getPlayerNameDisplay(playerName));
+                }
+            }
+
+            return stringBuffer.toString();
+        }
+
+        private String getPlayerNameDisplay(String playerName) {
+
+            // check to see if they are online
+            Player friendPlayer = getPlayer(playerName);
+            if (friendPlayer != null) {
+                return ChatColor.GREEN + playerName;
+            } else {
+                return ChatColor.GRAY + playerName;
+            }
+        }
+    }
 
     public CommandRequests() {
         super(SocialNetworkCommandType.requests);
@@ -60,7 +108,7 @@ public class CommandRequests extends SocialNetworkCommand<ISocialNetworkSettings
         verifySenderAsPlayer(sender);
 
         // check arguments
-        if (arguments.size() != 0) {
+        if (arguments.size() > 1) {
             throw new ArgumentsMissingException();
         }
 
@@ -69,10 +117,9 @@ public class CommandRequests extends SocialNetworkCommand<ISocialNetworkSettings
             throw new InvalidPermissionsException();
         }
 
-        Player player = (Player) sender;
-
         // get the social network data
-        SocialNetwork socialConfig = SocialNetwork.getInstance();
+        Player player = (Player) sender;
+        SocialNetworkStorage socialConfig = SocialNetworkPlugin.getStorage();
 
         // check to see if the sender is part of the network
         SocialPerson person = socialConfig.getPerson(player.getName());
@@ -80,133 +127,88 @@ public class CommandRequests extends SocialNetworkCommand<ISocialNetworkSettings
             throw new SenderNotInNetworkException();
         }
 
-        // group them by type
-        List<Request> friendRequests = new ArrayList<Request>();
-        List<Request> relationshipRequests = new ArrayList<Request>();
-        List<Request> engagementRequests = new ArrayList<Request>();
-        List<Request> affairRequests = new ArrayList<Request>();
-        List<Request> marriageRequests = new ArrayList<Request>();
-        List<Request> childRequests = new ArrayList<Request>();
-        List<Request> divorseRequests = new ArrayList<Request>();
-        List<Request> priestAdminRequests = new ArrayList<Request>();
-        List<Request> lawyerAdminRequests = new ArrayList<Request>();
+        Map<String, List<Request>> requestMessages = person.getMessages(Request.class);
 
-        // get the list of requests from each player
-        for (String key : person.getMessagePlayers(Request.class)) {
-            for (Request request : person.getMessagesFrom(key, Request.class)) {
+        // create the view objects
+        ResourcesConfig resources = SocialNetworkPlugin.getResources();
+        List<RequestsView> playerRequests = new ArrayList<RequestsView>();
+
+        RequestsView friendView = new RequestsView(resources.getResource("social.requests.tag.friend.sender"));
+        playerRequests.add(friendView);
+
+        RequestsView relationView = new RequestsView(resources.getResource("social.requests.tag.relationship.sender"));
+        playerRequests.add(relationView);
+
+        RequestsView affairView = new RequestsView(resources.getResource("social.requests.tag.affair.sender"));
+        playerRequests.add(affairView);
+
+        RequestsView engagementView = new RequestsView(resources.getResource("social.requests.tag.engagement.sender"));
+        playerRequests.add(engagementView);
+
+        RequestsView marriageView = new RequestsView(resources.getResource("social.requests.tag.marriage.sender"));
+        playerRequests.add(marriageView);
+
+        RequestsView childView = new RequestsView(resources.getResource("social.requests.tag.child.sender"));
+        playerRequests.add(childView);
+
+        RequestsView divorceView = new RequestsView(resources.getResource("social.requests.tag.divorce.sender"));
+        playerRequests.add(divorceView);
+
+        // group them by type
+        for (String playerName : requestMessages.keySet()) {
+            List<Request> requests = requestMessages.get(playerName);
+            for (Request request : requests) {
                 if (request.getCommandType() == SocialNetworkCommandType.relationship) {
-                    relationshipRequests.add(request);
+                    relationView.addPlayer(playerName);
                 } else if (request.getCommandType() == SocialNetworkCommandType.friend) {
-                    friendRequests.add(request);
+                    friendView.addPlayer(playerName);
                 } else if (request.getCommandType() == SocialNetworkCommandType.engagement) {
-                    engagementRequests.add(request);
+                    engagementView.addPlayer(playerName);
                 } else if (request.getCommandType() == SocialNetworkCommandType.affair) {
-                    affairRequests.add(request);
+                    affairView.addPlayer(playerName);
                 } else if (request.getCommandType() == SocialNetworkCommandType.marriage) {
-                    marriageRequests.add(request);
+                    marriageView.addPlayer(playerName);
                 } else if (request.getCommandType() == SocialNetworkCommandType.child) {
-                    childRequests.add(request);
+                    childView.addPlayer(playerName);
                 } else if (request.getCommandType() == SocialNetworkCommandType.divorce) {
-                    divorseRequests.add(request);
+                    divorceView.addPlayer(playerName);
                 }
             }
         }
 
-        // check to see if any of the lists got something added
-        boolean hasRequests =
-                (friendRequests.size() > 0) || (relationshipRequests.size() > 0) || (engagementRequests.size() > 0)
-                        || (affairRequests.size() > 0) || (marriageRequests.size() > 0) || (childRequests.size() > 0)
-                        || (divorseRequests.size() > 0);
-
-        // send the header
+        // display the header
         MessageUtil.sendHeaderMessage(sender, "social.requests.header.sender");
 
-        // we don't have anything, let the player know
-        if (!hasRequests) {
+        if (playerRequests.size() == 0) {
+
             MessageUtil.sendMessage(sender, "social.requests.noneAvailable.sender", ChatColor.RED);
-            return false;
+
+        } else {
+
+            // grab the sub list for displaying
+            for (RequestsView item : playerRequests) {
+                String displayView = item.toString();
+                if (StringUtils.isNotEmpty(displayView)) {
+                    player.sendMessage(displayView);
+                }
+            }
         }
 
-        // still here, time to display what we have
-        String friendTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.requests.tag.friend.sender");
-
-        String relationshipTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.requests.tag.relationship.sender");
-
-        String affairTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.requests.tag.affair.sender");
-
-        String engagementTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.requests.tag.engagement.sender");
-
-        String marriageTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.requests.tag.marriage.sender");
-
-        String childTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.requests.tag.child.sender");
-
-        String divorseTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.requests.tag.divorce.sender");
-
-        String priestTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.requests.tag.priestadmin.sender");
-
-        String lawyerTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.requests.tag.lawyeradmin.sender");
-
-        // okay, now we'll display them
-        displayRequests(player, friendTag, friendRequests);
-        displayRequests(player, relationshipTag, relationshipRequests);
-        displayRequests(player, engagementTag, engagementRequests);
-        displayRequests(player, affairTag, affairRequests);
-        displayRequests(player, marriageTag, marriageRequests);
-        displayRequests(player, childTag, childRequests);
-        displayRequests(player, divorseTag, divorseRequests);
-        displayRequests(player, priestTag, priestAdminRequests);
-        displayRequests(player, lawyerTag, lawyerAdminRequests);
+        // send a footer
+        MessageUtil.sendFooterLinesOnly(sender);
 
         return true;
-    }
-
-    private void displayRequests(Player player, String prefix, List<Request> requests) {
-
-        for (Request request : requests) {
-
-            String displayRequest = "";
-
-            // check to see if they are online
-            Player friendPlayer = getPlayer(request.getPlayerName());
-            if (friendPlayer != null) {
-                displayRequest = ChatColor.GREEN + prefix;
-            } else {
-                displayRequest = ChatColor.GRAY + prefix;
-            }
-
-            displayRequest += ChatColor.WHITE + " " + request.getPlayerName();
-            player.sendMessage(displayRequest);
-        }
     }
 
     @Override
     public HelpSegment help() {
 
-        ResourcesConfig config = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
-
-        HelpMessage mainCommand = new HelpMessage();
-        mainCommand.setCommand(getCommandType().toString());
-        mainCommand.setDescription(config.getResource("social.requests.help"));
-
+        ResourcesConfig resources = SocialNetworkPlugin.getResources();
         HelpSegment helpSegment = new HelpSegment(getCommandType());
+
+        HelpMessage mainCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), null, null,
+                        resources.getResource("social.requests.help"));
         helpSegment.addEntry(mainCommand);
 
         return helpSegment;

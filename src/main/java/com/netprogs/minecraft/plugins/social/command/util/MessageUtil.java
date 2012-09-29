@@ -7,10 +7,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.TimeZone;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 
 import org.apache.commons.lang.StringUtils;
@@ -41,11 +40,9 @@ import org.bukkit.entity.Player;
 
 public class MessageUtil {
 
-    private static final Logger logger = Logger.getLogger("Minecraft");
+    public static void sendHeaderMessage(CommandSender receiver, String resource, int pageNumber, int maxPages) {
 
-    public static void sendHeaderMessage(CommandSender receiver, String resource) {
-
-        ResourcesConfig resources = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
+        ResourcesConfig resources = SocialNetworkPlugin.getResources();
 
         ChatColor SPACER_COLOR = ChatColor.YELLOW;
         ChatColor TITLE_COLOR = ChatColor.AQUA;
@@ -53,7 +50,45 @@ public class MessageUtil {
         // create our header
         String title = resources.getResource(resource);
         if (title == null) {
-            logger.log(Level.SEVERE, "Could not find resource: " + resource);
+            SocialNetworkPlugin.logger().log(Level.SEVERE, "Could not find resource: " + resource);
+            return;
+        }
+
+        title = " " + title + " ";
+
+        if (pageNumber != 0 && maxPages != 0) {
+            title += "(" + pageNumber + "/" + maxPages + ") ";
+        }
+
+        String headerSpacer = StringUtils.repeat("-", 55);
+
+        int midPoint = ((headerSpacer.length() / 2) - (title.length() / 2));
+        String start = headerSpacer.substring(0, midPoint);
+        String middle = title;
+        String end = headerSpacer.substring(midPoint + title.length());
+
+        // combine it all into the final header
+        String displayHeader = SPACER_COLOR + start + TITLE_COLOR + middle + SPACER_COLOR + end;
+
+        // send the message
+        displayHeader = displayHeader.replaceAll("(&([A-Fa-f0-9L-Ol-o]))", "\u00A7$2");
+        receiver.sendMessage(displayHeader);
+    }
+
+    public static void sendHeaderMessage(CommandSender receiver, String resource) {
+
+        sendHeaderMessage(receiver, resource, 0, 0);
+
+        /*
+        ResourcesConfig resources = SocialNetworkPlugin.getResources();
+
+        ChatColor SPACER_COLOR = ChatColor.YELLOW;
+        ChatColor TITLE_COLOR = ChatColor.AQUA;
+
+        // create our header
+        String title = resources.getResource(resource);
+        if (title == null) {
+            SocialNetworkPlugin.logger().log(Level.SEVERE, "Could not find resource: " + resource);
             return;
         }
 
@@ -72,18 +107,19 @@ public class MessageUtil {
         // send the message
         displayHeader = displayHeader.replaceAll("(&([A-Fa-f0-9L-Ol-o]))", "\u00A7$2");
         receiver.sendMessage(displayHeader);
+        */
     }
 
     public static void sendFooterMessage(CommandSender receiver, String resource) {
 
-        ResourcesConfig resources = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
+        ResourcesConfig resources = SocialNetworkPlugin.getResources();
 
         ChatColor FOOTER_COLOR = ChatColor.DARK_GRAY;
 
         // create our header
         String footer = resources.getResource(resource);
         if (footer == null) {
-            logger.log(Level.SEVERE, "Could not find resource: " + resource);
+            SocialNetworkPlugin.logger().log(Level.SEVERE, "Could not find resource: " + resource);
             return;
         }
 
@@ -104,7 +140,31 @@ public class MessageUtil {
         receiver.sendMessage(displayFooter);
     }
 
+    public static void sendFooterLinesOnly(CommandSender receiver) {
+
+        ChatColor SPACER_COLOR = ChatColor.YELLOW;
+        String displayFooter = StringUtils.repeat("-", 50);
+
+        receiver.sendMessage(SPACER_COLOR + displayFooter);
+    }
+
+    public static void sendMessage(CommandSender receiver, String message) {
+
+        message = message.replaceAll("(&([A-Fa-f0-9L-Ol-o]))", "\u00A7$2");
+        receiver.sendMessage(message);
+    }
+
+    public static void sendMessage(SocialPerson receiver, String message) {
+
+        message = message.replaceAll("(&([A-Fa-f0-9L-Ol-o]))", "\u00A7$2");
+        Player player = Bukkit.getServer().getPlayer(receiver.getName());
+        if (player != null) {
+            player.sendMessage(message);
+        }
+    }
+
     public static void sendMessage(SocialPerson receiver, String resource, ChatColor baseColor) {
+
         Player player = Bukkit.getServer().getPlayer(receiver.getName());
         if (player != null) {
             MessageUtil.sendMessage(player, resource, baseColor);
@@ -113,9 +173,9 @@ public class MessageUtil {
 
     public static void sendMessage(CommandSender receiver, String resource, ChatColor baseColor) {
 
-        String requestSenderMessage = PluginConfig.getInstance().getConfig(ResourcesConfig.class).getResource(resource);
+        String requestSenderMessage = SocialNetworkPlugin.getResources().getResource(resource);
         if (requestSenderMessage == null) {
-            logger.log(Level.SEVERE, "Could not find resource: " + resource);
+            SocialNetworkPlugin.logger().log(Level.SEVERE, "Could not find resource: " + resource);
             return;
         }
 
@@ -126,9 +186,9 @@ public class MessageUtil {
     public static void sendMessage(CommandSender receiver, String resource, ChatColor baseColor,
             MessageParameter messageVariable) {
 
-        String requestSenderMessage = PluginConfig.getInstance().getConfig(ResourcesConfig.class).getResource(resource);
+        String requestSenderMessage = SocialNetworkPlugin.getResources().getResource(resource);
         if (requestSenderMessage == null) {
-            logger.log(Level.SEVERE, "Could not find resource: " + resource);
+            SocialNetworkPlugin.logger().log(Level.SEVERE, "Could not find resource: " + resource);
             return;
         }
 
@@ -144,9 +204,9 @@ public class MessageUtil {
     public static void sendMessage(CommandSender receiver, String resource, ChatColor baseColor,
             List<MessageParameter> messageVariables) {
 
-        String requestSenderMessage = PluginConfig.getInstance().getConfig(ResourcesConfig.class).getResource(resource);
+        String requestSenderMessage = SocialNetworkPlugin.getResources().getResource(resource);
         if (requestSenderMessage == null) {
-            logger.log(Level.SEVERE, "Could not find resource: " + resource);
+            SocialNetworkPlugin.logger().log(Level.SEVERE, "Could not find resource: " + resource);
             return;
         }
 
@@ -163,9 +223,9 @@ public class MessageUtil {
 
     public static void sendGlobalMessage(String resource, ChatColor baseColor, List<MessageParameter> messageVariables) {
 
-        String requestSenderMessage = PluginConfig.getInstance().getConfig(ResourcesConfig.class).getResource(resource);
+        String requestSenderMessage = SocialNetworkPlugin.getResources().getResource(resource);
         if (requestSenderMessage == null) {
-            logger.log(Level.SEVERE, "Could not find resource: " + resource);
+            SocialNetworkPlugin.logger().log(Level.SEVERE, "Could not find resource: " + resource);
             return;
         }
 

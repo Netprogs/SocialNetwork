@@ -1,14 +1,14 @@
-package com.netprogs.minecraft.plugins.social.config;
+package com.netprogs.minecraft.plugins.social.io;
 
 import java.lang.reflect.Type;
 
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
-import com.google.gson.JsonSerializationContext;
-import com.google.gson.JsonSerializer;
+import org.bukkit.craftbukkit.libs.com.google.gson.JsonDeserializationContext;
+import org.bukkit.craftbukkit.libs.com.google.gson.JsonDeserializer;
+import org.bukkit.craftbukkit.libs.com.google.gson.JsonElement;
+import org.bukkit.craftbukkit.libs.com.google.gson.JsonObject;
+import org.bukkit.craftbukkit.libs.com.google.gson.JsonParseException;
+import org.bukkit.craftbukkit.libs.com.google.gson.JsonSerializationContext;
+import org.bukkit.craftbukkit.libs.com.google.gson.JsonSerializer;
 
 /*
  * "Social Network" is a Craftbukkit Minecraft server modification plug-in. It attempts to add a 
@@ -54,7 +54,11 @@ public class JsonInterfaceAdapter<T> implements JsonSerializer<T>, JsonDeseriali
 
     private Type typeForName(final JsonElement typeElem) {
         try {
-            return Class.forName(typeElem.getAsString());
+            String className = typeElem.getAsString();
+            if (!className.contains(".")) {
+                className = "com.netprogs.minecraft.plugins.social.config.settings.perk." + className;
+            }
+            return Class.forName(className);
         } catch (ClassNotFoundException e) {
             throw new JsonParseException(e);
         }

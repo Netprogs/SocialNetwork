@@ -59,6 +59,28 @@ public class JsonSocialNetworkDataManager implements ISocialNetworkDataManager {
     }
 
     @Override
+    public List<String> getExcludedPlayers() {
+        return config.getNetwork().getExcludedPlayers();
+    }
+
+    @Override
+    public boolean isExcludedPlayer(String playerName) {
+        return config.getNetwork().getExcludedPlayers().contains(playerName);
+    }
+
+    @Override
+    public void addExcludedPlayer(String playerName) {
+        config.getNetwork().getExcludedPlayers().add(playerName);
+        config.saveConfig();
+    }
+
+    @Override
+    public void removeExcludedPlayer(String playerName) {
+        config.getNetwork().getExcludedPlayers().remove(playerName);
+        config.saveConfig();
+    }
+
+    @Override
     public List<String> getPriests() {
         return config.getNetwork().getPriests();
     }

@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.SocialPerson.WaitState;
 import com.netprogs.minecraft.plugins.social.command.ISocialNetworkCommand.ICommandType;
@@ -48,27 +49,30 @@ import com.netprogs.minecraft.plugins.social.command.group.CommandPriest;
 import com.netprogs.minecraft.plugins.social.command.group.CommandRelationship;
 import com.netprogs.minecraft.plugins.social.command.help.HelpBook;
 import com.netprogs.minecraft.plugins.social.command.help.HelpPage;
+import com.netprogs.minecraft.plugins.social.command.help.IHelpEntry;
 import com.netprogs.minecraft.plugins.social.command.perk.CommandGift;
 import com.netprogs.minecraft.plugins.social.command.perk.CommandSticky;
 import com.netprogs.minecraft.plugins.social.command.perk.CommandTeleport;
 import com.netprogs.minecraft.plugins.social.command.perk.CommandTell;
 import com.netprogs.minecraft.plugins.social.command.perk.IPerkCommand;
 import com.netprogs.minecraft.plugins.social.command.social.CommandAlerts;
+import com.netprogs.minecraft.plugins.social.command.social.CommandGender;
 import com.netprogs.minecraft.plugins.social.command.social.CommandHelp;
 import com.netprogs.minecraft.plugins.social.command.social.CommandIgnore;
 import com.netprogs.minecraft.plugins.social.command.social.CommandJoin;
-import com.netprogs.minecraft.plugins.social.command.social.CommandOnline;
+import com.netprogs.minecraft.plugins.social.command.social.CommandMute;
+import com.netprogs.minecraft.plugins.social.command.social.CommandPauseChat;
+import com.netprogs.minecraft.plugins.social.command.social.CommandProfile;
 import com.netprogs.minecraft.plugins.social.command.social.CommandQuit;
+import com.netprogs.minecraft.plugins.social.command.social.CommandStatusMessage;
+import com.netprogs.minecraft.plugins.social.command.social.CommandLastLogin;
+import com.netprogs.minecraft.plugins.social.command.social.CommandOnline;
 import com.netprogs.minecraft.plugins.social.command.social.CommandRequests;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.command.util.TimerUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
+import com.netprogs.minecraft.plugins.social.command.util.TimerManager;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.ISocialNetworkSettings;
-import com.netprogs.minecraft.plugins.social.config.settings.SettingsConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.perk.IPerkSettings;
-import com.netprogs.minecraft.plugins.social.integration.VaultIntegration;
-import com.netprogs.minecraft.plugins.social.storage.SocialNetwork;
 import com.netprogs.minecraft.plugins.social.storage.data.perk.IPersonPerkSettings;
 
 import org.bukkit.ChatColor;
@@ -76,6 +80,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
 
 /**
  * Dispatches all incoming commands off to their related {@link ISocialNetworkCommand} instance to handle.
@@ -83,13 +88,14 @@ import org.bukkit.entity.Player;
  */
 public class SocialNetworkDispatcher implements CommandExecutor {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
     private final Map<ICommandType, ISocialNetworkCommand<? extends ISocialNetworkSettings>> commands =
             new HashMap<ICommandType, ISocialNetworkCommand<? extends ISocialNetworkSettings>>();
 
-    public SocialNetworkDispatcher() {
+    private JavaPlugin plugin;
 
+    public SocialNetworkDispatcher(JavaPlugin plugin) {
+
+        this.plugin = plugin;
         createCommandMap();
     }
 
@@ -97,13 +103,13 @@ public class SocialNetworkDispatcher implements CommandExecutor {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] arguments) {
 
         // first thing we want to do is check for who's sending this request
-        if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
+        if (SocialNetworkPlugin.getSettings().isLoggingDebug()) {
             StringWriter argumentList = new StringWriter();
             for (String argument : arguments) {
                 argumentList.append(argument);
                 argumentList.append(" ");
             }
-            logger.info("Incoming command: " + argumentList.toString());
+            SocialNetworkPlugin.logger().info("Incoming command: " + argumentList.toString());
         }
 
         try {
@@ -123,7 +129,7 @@ public class SocialNetworkDispatcher implements CommandExecutor {
             } else {
 
                 // If we're here, the command wasn't given enough information.
-                MessageUtil.sendMessage(sender, "social.error.unknownArguments", ChatColor.RED);
+                MessageUtil.sendMessage(sender, "social.error.unknownCommand", ChatColor.RED);
                 return true;
             }
 
@@ -186,6 +192,11 @@ public class SocialNetworkDispatcher implements CommandExecutor {
                     // If we're here, the command wasn't given enough information.
                     MessageUtil.sendUnknownArgumentsMessage(sender);
 
+                    // display the help page for the attempted command
+                    for (IHelpEntry helpEntry : socialCommand.help().getEntries()) {
+                        MessageUtil.sendMessage(sender, helpEntry.display());
+                    }
+
                 } catch (InvalidPermissionsException exception) {
 
                     // If we're here, the sender requesting the command did not have permission to do so
@@ -202,7 +213,7 @@ public class SocialNetworkDispatcher implements CommandExecutor {
             }
 
             // Send all help messages if none matched
-            HelpBook.sendHelpPage(sender, 1);
+            SocialNetworkPlugin.getHelpBook().sendHelpPage(sender, plugin.getName(), 1);
 
         } catch (ArgumentsMissingException exception) {
 
@@ -232,8 +243,26 @@ public class SocialNetworkDispatcher implements CommandExecutor {
         CommandQuit quit = new CommandQuit();
         commands.put(SocialNetworkCommandType.quit, quit);
 
+        CommandGender gender = new CommandGender();
+        commands.put(SocialNetworkCommandType.gender, gender);
+
         CommandOnline online = new CommandOnline();
         commands.put(SocialNetworkCommandType.online, online);
+
+        CommandLastLogin lastlogin = new CommandLastLogin();
+        commands.put(SocialNetworkCommandType.lastlogin, lastlogin);
+
+        CommandStatusMessage status = new CommandStatusMessage();
+        commands.put(SocialNetworkCommandType.status, status);
+
+        CommandProfile profile = new CommandProfile();
+        commands.put(SocialNetworkCommandType.profile, profile);
+
+        CommandPauseChat pausechat = new CommandPauseChat();
+        commands.put(SocialNetworkCommandType.pausechat, pausechat);
+
+        CommandMute mute = new CommandMute();
+        commands.put(SocialNetworkCommandType.mute, mute);
 
         CommandRequests requests = new CommandRequests();
         commands.put(SocialNetworkCommandType.requests, requests);
@@ -305,68 +334,79 @@ public class SocialNetworkDispatcher implements CommandExecutor {
         //
         // Help Pages
         //
-        ResourcesConfig config = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
+        HelpBook helpBook = SocialNetworkPlugin.getHelpBook();
 
         // Page 1
         HelpPage baseHelpPage = new HelpPage();
-        baseHelpPage.addSegment(help.help());
-        baseHelpPage.addSegment(join.help());
-        baseHelpPage.addSegment(quit.help());
-        baseHelpPage.addSegment(online.help());
-        baseHelpPage.addSegment(requests.help());
-        baseHelpPage.addSegment(alerts.help());
-        baseHelpPage.addSegment(ignore.help());
-        HelpBook.addPage(baseHelpPage);
+        baseHelpPage.addCommand(help);
+        baseHelpPage.addCommand(join);
+        baseHelpPage.addCommand(quit);
+        baseHelpPage.addCommand(gender);
+        baseHelpPage.addCommand(requests);
+        baseHelpPage.addCommand(alerts);
+        baseHelpPage.addCommand(ignore);
+        helpBook.addPage(baseHelpPage);
+
+        // Page 2
+        HelpPage accessHelpPage = new HelpPage();
+        accessHelpPage.addCommand(online);
+        accessHelpPage.addCommand(lastlogin);
+        accessHelpPage.addCommand(profile);
+        accessHelpPage.addCommand(status);
+        accessHelpPage.addCommand(pausechat);
+        accessHelpPage.addCommand(mute);
+        helpBook.addPage(accessHelpPage);
 
         // Page 2
         HelpPage friendHelpPage = new HelpPage();
-        friendHelpPage.addSegment(friend.help());
-        HelpBook.addPage(friendHelpPage);
+        friendHelpPage.addCommand(friend);
+        helpBook.addPage(friendHelpPage);
 
         // Page 3
         HelpPage relationshipHelpPage = new HelpPage();
-        relationshipHelpPage.addSegment(relationship.help());
-        HelpBook.addPage(relationshipHelpPage);
+        relationshipHelpPage.addCommand(relationship);
+        helpBook.addPage(relationshipHelpPage);
 
         // Page 4
         HelpPage childHelpPage = new HelpPage();
-        childHelpPage.addSegment(child.help());
-        HelpBook.addPage(childHelpPage);
+        childHelpPage.addCommand(child);
+        helpBook.addPage(childHelpPage);
 
         // Page 5
         HelpPage engagementHelpPage = new HelpPage();
-        engagementHelpPage.addSegment(engagement.help());
-        HelpBook.addPage(engagementHelpPage);
+        engagementHelpPage.addCommand(engagement);
+        helpBook.addPage(engagementHelpPage);
 
         // Page 6
         HelpPage affairHelpPage = new HelpPage();
-        affairHelpPage.addSegment(affair.help());
-        HelpBook.addPage(affairHelpPage);
+        affairHelpPage.addCommand(affair);
+        helpBook.addPage(affairHelpPage);
 
         // Page 7
         HelpPage mdHelpPage = new HelpPage();
-        mdHelpPage.addSegment(marriage.help());
-        mdHelpPage.addSegment(divorce.help());
-        HelpBook.addPage(mdHelpPage);
+        mdHelpPage.addCommand(marriage);
+        mdHelpPage.addCommand(divorce);
+        helpBook.addPage(mdHelpPage);
 
         // Page 8
         HelpPage jobsHelpPage = new HelpPage();
-        jobsHelpPage.addSegment(priest.help());
-        jobsHelpPage.addSegment(lawyer.help());
-        HelpBook.addPage(jobsHelpPage);
+        jobsHelpPage.addCommand(priest);
+        jobsHelpPage.addCommand(lawyer);
+        helpBook.addPage(jobsHelpPage);
 
         // Page 9, Perks. Break apart as needed.
         HelpPage perks1HelpPage = new HelpPage(config.getResource("social.help.perks.title"));
-        perks1HelpPage.addSegment(teleport.help());
-        perks1HelpPage.addSegment(sticky.help());
-        perks1HelpPage.addSegment(tell.help());
-        perks1HelpPage.addSegment(gift.help());
-        HelpBook.addPage(perks1HelpPage);
+        perks1HelpPage.addCommand(teleport);
+        perks1HelpPage.addCommand(sticky);
+        perks1HelpPage.addCommand(gift);
+        perks1HelpPage.addCommand(tell);
+        helpBook.addPage(perks1HelpPage);
 
-        // leave as last
-        HelpPage adminHelpPage = new HelpPage();
-        adminHelpPage.addSegment(admin.help());
-        HelpBook.addPage(adminHelpPage);
+        // Admin commands
+        HelpPage adminHelpPage = new HelpPage(config.getResource("social.help.admin.title"));
+        adminHelpPage.addCommand(admin);
+        helpBook.addPage(adminHelpPage);
     }
 
     private boolean processWaitCommand(CommandSender sender, SocialNetworkCommandType requestedCommand) {
@@ -377,12 +417,13 @@ public class SocialNetworkDispatcher implements CommandExecutor {
         if ((sender instanceof Player)) {
 
             Player player = (Player) sender;
+            Logger logger = SocialNetworkPlugin.logger();
 
             // if the user is in a waiting state, then check to see if this requested command will handle it
-            SocialPerson person = SocialNetwork.getInstance().getPerson(player.getName());
+            SocialPerson person = SocialNetworkPlugin.getStorage().getPerson(player.getName());
             if (person != null && person.getWaitState() != null && person.getWaitState() != WaitState.notWaiting) {
 
-                if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
+                if (SocialNetworkPlugin.getSettings().isLoggingDebug()) {
                     logger.info("WaitState: " + person.getWaitState());
                     logger.info("WaitCommand: " + person.getWaitCommand());
                     logger.info("Requested Command: " + requestedCommand);
@@ -395,7 +436,7 @@ public class SocialNetworkDispatcher implements CommandExecutor {
                     // we got a wait command, so now let's check to see if it wants to handle the command
                     boolean isValidWaitResponse = ((IWaitCommand) socialCommand).isValidWaitReponse(sender, person);
 
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
+                    if (SocialNetworkPlugin.getSettings().isLoggingDebug()) {
                         logger.info("Requested command is an IWaitCommand");
                         logger.info("isValidWaitResponse: " + isValidWaitResponse);
                     }
@@ -404,9 +445,8 @@ public class SocialNetworkDispatcher implements CommandExecutor {
 
                 } else {
 
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("Requested command is NOT an IWaitCommand. Using person WaitCommand for help page.");
-                    }
+                    SocialNetworkPlugin
+                            .log("Requested command is NOT an IWaitCommand. Using person WaitCommand for help page.");
 
                     // The command requested wasn't an IWaitCommand, so let's use the person's getWaitCommand() and look
                     // it up so we can provide a help page.
@@ -489,7 +529,10 @@ public class SocialNetworkDispatcher implements CommandExecutor {
 
                 // Check to see if this command is on timer for the player. If so, cancel the command by returning
                 // false.
-                long remaining = TimerUtil.commandOnTimer(player.getName(), socialCommand.getCommandType());
+                long remaining =
+                        SocialNetworkPlugin.getTimerManager().commandOnTimer(player.getName(),
+                                socialCommand.getCommandType());
+
                 if (remaining > 0) {
 
                     // tell the user how much time remains
@@ -504,7 +547,7 @@ public class SocialNetworkDispatcher implements CommandExecutor {
                 //
 
                 double price = perkSettings.getPerUseCost();
-                boolean authorized = VaultIntegration.getInstance().preAuthCommandPurchase(player, price);
+                boolean authorized = SocialNetworkPlugin.getVault().preAuthCommandPurchase(player, price);
                 if (!authorized) {
                     return false;
                 }
@@ -565,19 +608,18 @@ public class SocialNetworkDispatcher implements CommandExecutor {
                 // get the cooldown
                 cooldown = perkSettings.getCoolDownPeriod();
 
-                if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                    logger.info("Using perk cooldown: " + TimerUtil.formatTime(cooldown));
-                }
+                SocialNetworkPlugin.log("Using perk cooldown: " + TimerManager.formatTimeUtc(cooldown));
 
                 // update the timer for the command
-                TimerUtil.updateCommandTimer(player.getName(), socialCommand.getCommandType(), cooldown);
+                SocialNetworkPlugin.getTimerManager().updateCommandTimer(player.getName(),
+                        socialCommand.getCommandType(), cooldown);
 
                 //
                 // Step 3: Charge the user for the price of the usage.
                 //
 
                 double price = perkSettings.getPerUseCost();
-                boolean successful = VaultIntegration.getInstance().processCommandPurchase(player, price);
+                boolean successful = SocialNetworkPlugin.getVault().processCommandPurchase(player, price);
                 if (!successful) {
                     return false;
                 }
@@ -591,15 +633,12 @@ public class SocialNetworkDispatcher implements CommandExecutor {
     private SocialPerson getSenderPerson(CommandSender sender) throws SenderNotInNetworkException,
             SenderNotPlayerException {
 
-        // get the social network data
-        SocialNetwork socialConfig = SocialNetwork.getInstance();
-
         if ((sender instanceof Player)) {
 
             Player player = (Player) sender;
 
             // Get their social data
-            SocialPerson person = socialConfig.getPerson(player.getName());
+            SocialPerson person = SocialNetworkPlugin.getStorage().getPerson(player.getName());
             if (person != null) {
                 return person;
             } else {

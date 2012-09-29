@@ -8,11 +8,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.logging.Logger;
 
 import com.netprogs.minecraft.plugins.social.command.ISocialNetworkCommand.ICommandType;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommandType;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
+import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.SettingsConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.group.AffairSettings;
 import com.netprogs.minecraft.plugins.social.config.settings.group.ChildSettings;
@@ -64,8 +63,6 @@ import org.bukkit.Bukkit;
 
 public class SocialPerson {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
     // use these for permissions also
     public enum Status {
         single, relationship, engaged, married, divorced
@@ -93,6 +90,9 @@ public class SocialPerson {
     private final ReentrantReadWriteLock rwMessageQueueLock = new ReentrantReadWriteLock(true);
     private final ReentrantReadWriteLock rwWaitLock = new ReentrantReadWriteLock(true);
     private final ReentrantReadWriteLock rwIgnoreLock = new ReentrantReadWriteLock(true);
+    private final ReentrantReadWriteLock rwStatusLock = new ReentrantReadWriteLock(true);
+    private final ReentrantReadWriteLock rwStatusMessageLock = new ReentrantReadWriteLock(true);
+    private final ReentrantReadWriteLock rwNotificationsLock = new ReentrantReadWriteLock(true);
 
     private final ReentrantReadWriteLock rwChildLock = new ReentrantReadWriteLock(true);
     private final ReentrantReadWriteLock rwFriendLock = new ReentrantReadWriteLock(true);
@@ -101,7 +101,6 @@ public class SocialPerson {
 
     private final ReentrantReadWriteLock rwNameLock = new ReentrantReadWriteLock(true);
     private final ReentrantReadWriteLock rwGenderLock = new ReentrantReadWriteLock(true);
-    private final ReentrantReadWriteLock rwStatusLock = new ReentrantReadWriteLock(true);
     private final ReentrantReadWriteLock rwChildOfLock = new ReentrantReadWriteLock(true);
     private final ReentrantReadWriteLock rwEngagementLock = new ReentrantReadWriteLock(true);
     private final ReentrantReadWriteLock rwMarriageLock = new ReentrantReadWriteLock(true);
@@ -119,63 +118,97 @@ public class SocialPerson {
     private SocialMarriage socialMarriage;
     private SocialDivorce socialDivorce;
 
+    // This stores the current list of group settings this person belongs to
+    private final Map<Class<? extends GroupSettings>, GroupSettings> settingsMap =
+            new HashMap<Class<? extends GroupSettings>, GroupSettings>();
+
     public SocialPerson(Person person) {
 
         this.person = person;
 
         generateSocialMappings();
+        generateGroupSettingsMap();
     }
 
-    private void generateSocialMappings() {
-
-        for (Friend friend : person.getFriends().values()) {
-            friends.put(friend.getPlayerName(), new SocialFriend(friend));
-        }
-
-        for (Child child : person.getChildren().values()) {
-            children.put(child.getPlayerName(), new SocialChild(child));
-        }
-
-        for (Affair affair : person.getAffairs().values()) {
-            affairs.put(affair.getPlayerName(), new SocialAffair(affair));
-        }
-
-        for (Relationship relationship : person.getRelationships().values()) {
-            relationships.put(relationship.getPlayerName(), new SocialRelationship(relationship));
-        }
-
-        if (person.getEngagement() != null) {
-            socialEngagement = new SocialEngagement(person.getEngagement());
-        }
-
-        if (person.getMarriage() != null) {
-            socialMarriage = new SocialMarriage(person.getMarriage());
-        }
-
-        if (person.getDivorce() != null) {
-            socialDivorce = new SocialDivorce(person.getDivorce());
-        }
-
-    }
-
-    /**
-     * Returns a read-only copy of the friends list.
-     * @return
-     */
-    public List<SocialFriend> getFriends() {
-        Lock lock = rwFriendLock.readLock();
+    public boolean isLoginUpdatesIgnored() {
+        Lock lock = rwNotificationsLock.readLock();
         lock.lock();
         try {
-            return new ArrayList<SocialFriend>(friends.values());
+            return person.isLoginUpdatesIgnored();
         } finally {
             lock.unlock();
         }
     }
 
-    public void addFriend(String memberName) {
+    public void setLoginUpdatesIgnored(boolean ignoreUpdates) {
+        Lock lock = rwNotificationsLock.writeLock();
+        lock.lock();
+        try {
+            person.setLoginUpdatesIgnored(ignoreUpdates);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public boolean isStatusUpdatesIgnored() {
+        Lock lock = rwNotificationsLock.readLock();
+        lock.lock();
+        try {
+            return person.isStatusUpdatesIgnored();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void setStatusUpdatesIgnored(boolean ignoreUpdates) {
+        Lock lock = rwNotificationsLock.writeLock();
+        lock.lock();
+        try {
+            person.setStatusUpdatesIgnored(ignoreUpdates);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public boolean isGenderChoiceRemindersIgnored() {
+        Lock lock = rwNotificationsLock.readLock();
+        lock.lock();
+        try {
+            return person.isGenderChoiceRemindersIgnored();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void setGenderChoiceRemindersIgnored(boolean ignoreUpdates) {
+        Lock lock = rwNotificationsLock.writeLock();
+        lock.lock();
+        try {
+            person.setGenderChoiceRemindersIgnored(ignoreUpdates);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Returns an unmodifiable version of the friends map.
+     * @return
+     */
+    public Map<String, SocialFriend> getFriends() {
+        Lock lock = rwFriendLock.readLock();
+        lock.lock();
+        try {
+            return Collections.unmodifiableMap(friends);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void addFriend(SocialPerson memberPerson) {
         Lock lock = rwFriendLock.writeLock();
         lock.lock();
         try {
+            String memberName = memberPerson.getName();
             firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.friend, Type.preAdd, false);
 
             Friend friend = new Friend(memberName);
@@ -189,10 +222,11 @@ public class SocialPerson {
         }
     }
 
-    public void removeFriend(String memberName) {
+    public void removeFriend(SocialPerson memberPerson) {
         Lock lock = rwFriendLock.writeLock();
         lock.lock();
         try {
+            String memberName = memberPerson.getName();
             firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.friend, Type.preRemove, (person
                     .getFriends().size() == 0));
 
@@ -206,28 +240,29 @@ public class SocialPerson {
         }
     }
 
-    public boolean isFriendWith(String memberName) {
-        return friends.containsKey(memberName);
+    public boolean isFriendWith(SocialPerson memberPerson) {
+        return friends.containsKey(memberPerson.getName());
     }
 
     public int getNumberFriends() {
         return friends.values().size();
     }
 
-    public List<SocialAffair> getAffairs() {
+    public Map<String, SocialAffair> getAffairs() {
         Lock lock = rwAffairLock.readLock();
         lock.lock();
         try {
-            return new ArrayList<SocialAffair>(affairs.values());
+            return Collections.unmodifiableMap(affairs);
         } finally {
             lock.unlock();
         }
     }
 
-    public void addAffair(String memberName) {
+    public void addAffair(SocialPerson memberPerson) {
         Lock lock = rwAffairLock.writeLock();
         lock.lock();
         try {
+            String memberName = memberPerson.getName();
             firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.affair, Type.preAdd, false);
 
             Affair affair = new Affair(memberName);
@@ -241,10 +276,11 @@ public class SocialPerson {
         }
     }
 
-    public void removeAffair(String memberName) {
+    public void removeAffair(SocialPerson memberPerson) {
         Lock lock = rwAffairLock.writeLock();
         lock.lock();
         try {
+            String memberName = memberPerson.getName();
             firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.affair, Type.preRemove, (person
                     .getAffairs().size() == 0));
 
@@ -258,124 +294,67 @@ public class SocialPerson {
         }
     }
 
-    public boolean isAffairWith(String memberName) {
-        return affairs.containsKey(memberName);
+    public boolean isAffairWith(SocialPerson memberPerson) {
+        return affairs.containsKey(memberPerson.getName());
     }
 
     public int getNumberAffairs() {
         return affairs.values().size();
     }
 
-    public List<SocialChild> getChildren() {
+    /**
+     * Returns an unmodifiable version of the friends map.
+     * @return
+     */
+    public Map<String, SocialChild> getChildren() {
         Lock lock = rwChildLock.readLock();
         lock.lock();
         try {
-            return new ArrayList<SocialChild>(children.values());
+            return Collections.unmodifiableMap(children);
         } finally {
             lock.unlock();
         }
     }
 
-    public void addChild(String memberName) {
+    public void addChild(SocialPerson memberPerson) {
         Lock lock = rwChildLock.writeLock();
         lock.lock();
         try {
-            firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.child, Type.preAdd, false);
+            firePlayerMemberChangeEvent(memberPerson.getName(), SocialNetworkCommandType.child, Type.preAdd, false);
 
-            Child child = new Child(memberName);
-            person.getChildren().put(memberName, child);
-            children.put(memberName, new SocialChild(child));
+            Child child = new Child(memberPerson.getName());
+            person.getChildren().put(memberPerson.getName(), child);
+            children.put(memberPerson.getName(), new SocialChild(child));
 
-            firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.child, Type.postAdd, false);
+            firePlayerMemberChangeEvent(memberPerson.getName(), SocialNetworkCommandType.child, Type.postAdd, false);
         } finally {
             lock.unlock();
         }
     }
 
-    public void removeChild(String memberName) {
+    public void removeChild(SocialPerson memberPerson) {
         Lock lock = rwChildLock.writeLock();
         lock.lock();
         try {
-            firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.child, Type.preRemove, (person
+            firePlayerMemberChangeEvent(memberPerson.getName(), SocialNetworkCommandType.child, Type.preRemove, (person
                     .getChildren().size() == 0));
 
-            person.getChildren().remove(memberName);
-            children.remove(memberName);
+            person.getChildren().remove(memberPerson.getName());
+            children.remove(memberPerson.getName());
 
-            firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.child, Type.postRemove, (person
-                    .getChildren().size() == 0));
+            firePlayerMemberChangeEvent(memberPerson.getName(), SocialNetworkCommandType.child, Type.postRemove,
+                    (person.getChildren().size() == 0));
         } finally {
             lock.unlock();
         }
     }
 
-    public boolean isParentOf(String memberName) {
-        return children.containsKey(memberName);
+    public boolean isParentOf(SocialPerson memberPerson) {
+        return children.containsKey(memberPerson.getName());
     }
 
     public int getNumberChildren() {
         return children.values().size();
-    }
-
-    public List<SocialRelationship> getRelationships() {
-        Lock lock = rwRelationshipLock.readLock();
-        lock.lock();
-        try {
-            return new ArrayList<SocialRelationship>(relationships.values());
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    public void addRelationship(String memberName) {
-        Lock lock = rwRelationshipLock.writeLock();
-        lock.lock();
-        try {
-            firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.relationship, Type.preAdd, false);
-
-            Relationship relationship = new Relationship(memberName);
-            person.getRelationships().put(memberName, relationship);
-            relationships.put(memberName, new SocialRelationship(relationship));
-
-            firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.relationship, Type.postAdd, false);
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    public void removeRelationship(String memberName) {
-        Lock lock = rwRelationshipLock.writeLock();
-        lock.lock();
-        try {
-            firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.relationship, Type.preRemove, (person
-                    .getRelationships().size() == 0));
-
-            person.getRelationships().remove(memberName);
-            relationships.remove(memberName);
-
-            firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.relationship, Type.postRemove, (person
-                    .getRelationships().size() == 0));
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    public boolean isRelationshipWith(String memberName) {
-        return relationships.containsKey(memberName);
-    }
-
-    public int getNumberRelationships() {
-        return relationships.values().size();
-    }
-
-    public SocialEngagement getEngagement() {
-        Lock lock = rwEngagementLock.readLock();
-        lock.lock();
-        try {
-            return socialEngagement;
-        } finally {
-            lock.unlock();
-        }
     }
 
     public String getChildOf() {
@@ -388,10 +367,21 @@ public class SocialPerson {
         }
     }
 
-    public void createChildOf(String childOf) {
+    public boolean isChildOf(SocialPerson memberPerson) {
+
+        String childOf = getChildOf();
+        if (childOf != null) {
+            return childOf.equals(memberPerson.getName());
+        }
+
+        return false;
+    }
+
+    public void createChildOf(SocialPerson memberPerson) {
         Lock lock = rwChildOfLock.writeLock();
         lock.lock();
         try {
+            String childOf = memberPerson.getName();
             if (childOf != null) {
                 firePlayerMemberChangeEvent(childOf, SocialNetworkCommandType.child, Type.preAdd, false);
                 person.setChildOf(childOf);
@@ -424,10 +414,87 @@ public class SocialPerson {
         }
     }
 
-    public void createEngagement(String memberName) {
+    public Map<String, SocialRelationship> getRelationships() {
+        Lock lock = rwRelationshipLock.readLock();
+        lock.lock();
+        try {
+            return Collections.unmodifiableMap(relationships);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void addRelationship(SocialPerson memberPerson) {
+        Lock lock = rwRelationshipLock.writeLock();
+        lock.lock();
+        try {
+            String memberName = memberPerson.getName();
+            firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.relationship, Type.preAdd, false);
+
+            Relationship relationship = new Relationship(memberName);
+            person.getRelationships().put(memberName, relationship);
+            relationships.put(memberName, new SocialRelationship(relationship));
+
+            firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.relationship, Type.postAdd, false);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void removeRelationship(SocialPerson memberPerson) {
+        Lock lock = rwRelationshipLock.writeLock();
+        lock.lock();
+        try {
+            String memberName = memberPerson.getName();
+            firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.relationship, Type.preRemove, (person
+                    .getRelationships().size() == 0));
+
+            person.getRelationships().remove(memberName);
+            relationships.remove(memberName);
+
+            firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.relationship, Type.postRemove, (person
+                    .getRelationships().size() == 0));
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public boolean isRelationshipWith(SocialPerson memberPerson) {
+        String memberName = memberPerson.getName();
+        return relationships.containsKey(memberName);
+    }
+
+    public int getNumberRelationships() {
+        return relationships.values().size();
+    }
+
+    public SocialEngagement getEngagement() {
+        Lock lock = rwEngagementLock.readLock();
+        lock.lock();
+        try {
+            return socialEngagement;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public boolean isEngagedTo(SocialPerson memberPerson) {
+
+        SocialEngagement engagement = getEngagement();
+
+        // if the engagement object is valid and it's player is the same as the memberName given, then we have a match
+        if (engagement != null && engagement.getPlayerName().equalsIgnoreCase(memberPerson.getName())) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public void createEngagement(SocialPerson memberPerson) {
         Lock lock = rwEngagementLock.writeLock();
         lock.lock();
         try {
+            String memberName = memberPerson.getName();
             firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.engagement, Type.preAdd, false);
 
             Engagement engagement = new Engagement(memberName);
@@ -473,10 +540,22 @@ public class SocialPerson {
         }
     }
 
-    public void createMarriage(String memberName) {
+    public boolean isMarriedTo(SocialPerson memberPerson) {
+
+        // if the marriage object is valid and it's player is the same as the memberName given, then we have a match
+        SocialMarriage marriage = getMarriage();
+        if (marriage != null && marriage.getPlayerName().equalsIgnoreCase(memberPerson.getName())) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public void createMarriage(SocialPerson memberPerson) {
         Lock lock = rwMarriageLock.writeLock();
         lock.lock();
         try {
+            String memberName = memberPerson.getName();
             firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.marriage, Type.preAdd, false);
 
             Marriage marriage = new Marriage(memberName);
@@ -523,10 +602,22 @@ public class SocialPerson {
         }
     }
 
-    public void createDivorce(String memberName) {
+    public boolean isDivorcedFrom(SocialPerson memberPerson) {
+
+        // if the divorce object is valid and it's player is the same as the groupPerson given, then we have a match
+        SocialDivorce divorce = getDivorce();
+        if (divorce != null && divorce.getPlayerName().equalsIgnoreCase(memberPerson.getName())) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public void createDivorce(SocialPerson memberPerson) {
         Lock lock = rwDivorceLock.writeLock();
         lock.lock();
         try {
+            String memberName = memberPerson.getName();
             firePlayerMemberChangeEvent(memberName, SocialNetworkCommandType.divorce, Type.preAdd, false);
 
             Divorce divorce = new Divorce(memberName);
@@ -573,10 +664,30 @@ public class SocialPerson {
     }
 
     public void setSocialStatus(Status socialStatus) {
-        Lock lock = rwRelationshipLock.writeLock();
+        Lock lock = rwStatusLock.writeLock();
         lock.lock();
         try {
             person.setSocialStatus(socialStatus);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public String getStatusMessage() {
+        Lock lock = rwStatusMessageLock.readLock();
+        lock.lock();
+        try {
+            return person.getStatusMessage();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void setStatusMessage(String statusMessage) {
+        Lock lock = rwStatusMessageLock.writeLock();
+        lock.lock();
+        try {
+            person.setStatusMessage(statusMessage);
         } finally {
             lock.unlock();
         }
@@ -602,6 +713,16 @@ public class SocialPerson {
         }
     }
 
+    public String getGenderDisplay() {
+
+        ResourcesConfig resources = SocialNetworkPlugin.getResources();
+        if (getGender() == SocialPerson.Gender.male) {
+            return resources.getResource("social.label.male");
+        } else {
+            return resources.getResource("social.label.female");
+        }
+    }
+
     public void setGender(Gender gender) {
         Lock lock = rwGenderLock.writeLock();
         lock.lock();
@@ -610,6 +731,10 @@ public class SocialPerson {
         } finally {
             lock.unlock();
         }
+    }
+
+    public long getDateJoined() {
+        return person.getDateJoined();
     }
 
     public void waitOn(WaitState waitState, ICommandType waitCommand) {
@@ -718,27 +843,25 @@ public class SocialPerson {
         }
     }
 
-    public void addIgnore(String playerName) {
+    public void addIgnore(SocialPerson memberPerson) {
         Lock lock = rwIgnoreLock.writeLock();
         lock.lock();
         try {
+            String playerName = memberPerson.getName();
             person.getIgnoreList().add(playerName);
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("[" + person.getName() + "] is now ignoring " + playerName);
-            }
+            SocialNetworkPlugin.log("[" + person.getName() + "] is now ignoring " + playerName);
         } finally {
             lock.unlock();
         }
     }
 
-    public void removeIgnore(String playerName) {
+    public void removeIgnore(SocialPerson memberPerson) {
         Lock lock = rwIgnoreLock.writeLock();
         lock.lock();
         try {
+            String playerName = memberPerson.getName();
             person.getIgnoreList().remove(playerName);
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("[" + person.getName() + "] is no longer ignoring " + playerName);
-            }
+            SocialNetworkPlugin.log("[" + person.getName() + "] is no longer ignoring " + playerName);
         } finally {
             lock.unlock();
         }
@@ -748,7 +871,7 @@ public class SocialPerson {
         Lock lock = rwIgnoreLock.writeLock();
         lock.lock();
         try {
-            return new ArrayList<String>(person.getIgnoreList());
+            return Collections.unmodifiableList(person.getIgnoreList());
         } finally {
             lock.unlock();
         }
@@ -759,14 +882,13 @@ public class SocialPerson {
      * @param playerName The name to check to see if they're on ignore by this person.
      * @return True if ignored, false otherwise.
      */
-    public boolean isOnIgnore(String playerName) {
+    public boolean isOnIgnore(SocialPerson memberPerson) {
         Lock lock = rwIgnoreLock.writeLock();
         lock.lock();
         try {
+            String playerName = memberPerson.getName();
             boolean isOnIgnore = person.getIgnoreList().contains(playerName);
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("[" + person.getName() + "] is ignoring " + playerName + ":" + isOnIgnore);
-            }
+            SocialNetworkPlugin.log("[" + person.getName() + "] is ignoring " + playerName + ":" + isOnIgnore);
             return isOnIgnore;
         } finally {
             lock.unlock();
@@ -774,13 +896,12 @@ public class SocialPerson {
     }
 
     /**
-     * Returns a read-only copy of the messages for the person. Adding/removing to this list will not affect the person.
-     * @param fromPlayerName
+     * Returns all the messages of the given type.
      * @param messageClass
      * @return
      */
     @SuppressWarnings("unchecked")
-    public <U extends IMessage> List<U> getMessagesFrom(String fromPlayerName, Class<U> messageClass) {
+    public <U extends IMessage> Map<String, List<U>> getMessages(Class<U> messageClass) {
 
         Lock lock = rwMessageQueueLock.readLock();
         lock.lock();
@@ -788,11 +909,71 @@ public class SocialPerson {
 
             String className = messageClass.getCanonicalName();
             if (person.getMessageQueue().containsKey(className)) {
-                if (person.getMessageQueue().get(className).containsKey(fromPlayerName)) {
+
+                Map<String, List<U>> map =
+                        new HashMap<String, List<U>>((Map<? extends String, ? extends List<U>>) person
+                                .getMessageQueue().get(className));
+                return Collections.unmodifiableMap(map);
+            }
+
+            // return an empty list
+            return Collections.emptyMap();
+
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Returns all the messages of the given type for the given player name.
+     * @param playerFrom
+     * @param classObject
+     * @return
+     */
+    public <U extends IMessage> List<U> getMessagesFrom(SocialPerson playerFrom, Class<U> classObject) {
+
+        return getMessagesFrom(playerFrom.getName(), classObject, true);
+    }
+
+    /**
+     * Returns all the messages of the given type for the given player name.
+     * @param playerFrom
+     * @param classObject
+     * @return
+     */
+    public <U extends IMessage> List<U> getMessagesFrom(SocialPerson playerFrom, Class<U> classObject,
+            boolean createCopy) {
+
+        return getMessagesFrom(playerFrom.getName(), classObject, createCopy);
+    }
+
+    /**
+     * Returns all the messages of the given type for the given player name.
+     * This version allows us to not create a copy allowing us to work with it internally.
+     * @param fromPlayerName
+     * @param messageClass
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+    private <U extends IMessage> List<U> getMessagesFrom(String fromPersonName, Class<U> messageClass,
+            boolean createCopy) {
+
+        Lock lock = rwMessageQueueLock.readLock();
+        lock.lock();
+        try {
+
+            String className = messageClass.getCanonicalName();
+            if (person.getMessageQueue().containsKey(className)) {
+                if (person.getMessageQueue().get(className).containsKey(fromPersonName)) {
 
                     // send back a copy of the items instead of the original list
-                    List<U> messages = (List<U>) person.getMessageQueue().get(className).get(fromPlayerName);
-                    return new ArrayList<U>(messages);
+                    List<U> messages = (List<U>) person.getMessageQueue().get(className).get(fromPersonName);
+
+                    if (createCopy) {
+                        return Collections.unmodifiableList(messages);
+                    } else {
+                        return messages;
+                    }
                 }
             }
 
@@ -804,18 +985,18 @@ public class SocialPerson {
         }
     }
 
-    public <U extends IMessage> List<String> getMessagePlayers(Class<U> messageClass) {
+    public Set<String> getMessagePlayers(Class<? extends IMessage> messageClass) {
 
         Lock lock = rwMessageQueueLock.readLock();
         lock.lock();
         try {
             String className = messageClass.getCanonicalName();
             if (person.getMessageQueue().get(className) != null) {
-                return new ArrayList<String>(person.getMessageQueue().get(className).keySet());
+                return Collections.unmodifiableSet(person.getMessageQueue().get(className).keySet());
             }
 
             // return an empty list
-            return Collections.emptyList();
+            return Collections.emptySet();
 
         } finally {
             lock.unlock();
@@ -865,7 +1046,7 @@ public class SocialPerson {
     }
 
     @SuppressWarnings("unchecked")
-    public <U extends IMessage> void addMessage(String fromPlayerName, U message) {
+    public <U extends IMessage> void addMessage(SocialPerson fromPerson, U message) {
 
         Lock lock = rwMessageQueueLock.writeLock();
         lock.lock();
@@ -874,38 +1055,42 @@ public class SocialPerson {
             // check to see if this message type has a queue entry, if not, make one
             String className = message.getClass().getCanonicalName();
 
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("Adding message queue entry: [" + fromPlayerName + ", " + message + "]");
-            }
+            SocialNetworkPlugin.log("Adding message entry: [" + fromPerson.getName() + ", " + message + "]");
 
             // If there isn't an entry for this message type, then create one
             Map<String, List<? extends IMessage>> playerMessageMap = person.getMessageQueue().get(className);
             if (playerMessageMap == null) {
 
-                if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                    logger.info("Creating new message queue entry: [" + fromPlayerName + ", " + message + "]");
-                }
-
-                List<? extends IMessage> messageList = new ArrayList<U>();
                 playerMessageMap = new HashMap<String, List<? extends IMessage>>();
-                playerMessageMap.put(fromPlayerName, messageList);
                 person.getMessageQueue().put(className, playerMessageMap);
             }
 
+            // If there isn't an entry for given fromPerson, then create their list now
+            List<U> messageList = (List<U>) playerMessageMap.get(fromPerson.getName());
+            if (messageList == null) {
+
+                SocialNetworkPlugin.log("Creating new message entry: [" + fromPerson.getName() + ", " + message + "]");
+
+                messageList = new ArrayList<U>();
+                playerMessageMap.put(fromPerson.getName(), messageList);
+            }
+
             // add the message
-            List<U> playerList = (List<U>) playerMessageMap.get(fromPlayerName);
-            playerList.add(message);
+            messageList.add(message);
 
         } finally {
             lock.unlock();
         }
     }
 
-    public <U extends IMessage> void removeMessage(String fromPlayerName, U message) {
+    public <U extends IMessage> void removeMessage(SocialPerson fromPerson, U message) {
+
+        String fromPlayerName = fromPerson.getName();
 
         Lock lock = rwMessageQueueLock.writeLock();
         lock.lock();
         try {
+
             String className = message.getClass().getCanonicalName();
 
             // check to make sure there is a message of this type in the queue
@@ -940,9 +1125,9 @@ public class SocialPerson {
      * @param messageClass
      * @return
      */
-    public void removeMessagesFrom(String fromPlayerName) {
+    public void removeMessagesFrom(SocialPerson fromPerson) {
 
-        Lock lock = rwMessageQueueLock.readLock();
+        Lock lock = rwMessageQueueLock.writeLock();
         lock.lock();
         try {
 
@@ -950,7 +1135,7 @@ public class SocialPerson {
             for (String className : person.getMessageQueue().keySet()) {
 
                 // remove the person
-                person.getMessageQueue().get(className).remove(fromPlayerName);
+                person.getMessageQueue().get(className).remove(fromPerson.getName());
 
                 // if the message type list is empty, remove it also, just to save object memory
                 if (person.getMessageQueue().get(className).keySet().size() == 0) {
@@ -963,40 +1148,10 @@ public class SocialPerson {
         }
     }
 
-    /**
-     * Returns all the messages of the given type for the given player name.
-     * This version does not create a copy allowing us to work with it internally.
-     * @param playerFrom
-     * @param classObject
-     * @return
-     */
-    @SuppressWarnings("unchecked")
-    private <U extends IMessage> List<U> getMessagesFrom(SocialPerson playerFrom, Class<U> classObject) {
-
-        Lock lock = rwMessageQueueLock.readLock();
-        lock.lock();
-        try {
-
-            // get the list of requests for the player
-            String className = classObject.getCanonicalName();
-            if (person.getMessageQueue().containsKey(className)) {
-                if (person.getMessageQueue().get(className).containsKey(playerFrom.getName())) {
-                    return (List<U>) person.getMessageQueue().get(className).get(playerFrom.getName());
-                }
-            }
-
-            // return an empty list
-            return Collections.emptyList();
-
-        } finally {
-            lock.unlock();
-        }
-    }
-
     public boolean addRequest(SocialPerson playerFrom, ICommandType requestType) {
 
         // get the request messages from the player
-        List<Request> requests = getMessagesFrom(playerFrom, Request.class);
+        List<Request> requests = getMessagesFrom(playerFrom, Request.class, false);
 
         // now we have a list of requests
         boolean hasRequestFromPlayer = false;
@@ -1016,7 +1171,7 @@ public class SocialPerson {
             Request request = new Request(playerFrom.getName(), requestType);
 
             // and throw it onto the message queue
-            addMessage(playerFrom.getName(), request);
+            addMessage(playerFrom, request);
 
             return true;
         }
@@ -1027,7 +1182,7 @@ public class SocialPerson {
     public boolean removeRequest(SocialPerson playerFrom, ICommandType requestType) {
 
         // get the request messages from the player
-        List<Request> requests = getMessagesFrom(playerFrom, Request.class);
+        List<Request> requests = getMessagesFrom(playerFrom, Request.class, false);
 
         // check to see if the person has sent them a request of this type
         for (Request request : requests) {
@@ -1035,7 +1190,7 @@ public class SocialPerson {
             if (request.getCommandType() == requestType) {
 
                 // okay, now we want to remove this from the list
-                removeMessage(playerFrom.getName(), request);
+                removeMessage(playerFrom, request);
 
                 return true;
             }
@@ -1047,7 +1202,7 @@ public class SocialPerson {
     public boolean hasRequest(SocialPerson playerFrom, ICommandType requestType) {
 
         // get the request messages from the player
-        List<Request> requests = getMessagesFrom(playerFrom, Request.class);
+        List<Request> requests = getMessagesFrom(playerFrom, Request.class, false);
 
         // check to see if the person has sent them a request of this type
         for (Request request : requests) {
@@ -1063,7 +1218,7 @@ public class SocialPerson {
     public boolean addAlert(SocialPerson playerFrom, Alert.Type alertType, String alertMessage) {
 
         // get the alert messages from the player
-        List<Alert> alerts = getMessagesFrom(playerFrom, Alert.class);
+        List<Alert> alerts = getMessagesFrom(playerFrom, Alert.class, false);
 
         // now we have a list of alerts
         boolean hasAlertFromPlayer = false;
@@ -1083,7 +1238,7 @@ public class SocialPerson {
             Alert alert = new Alert(playerFrom.getName(), alertType, alertMessage);
 
             // and throw it onto the message queue
-            addMessage(playerFrom.getName(), alert);
+            addMessage(playerFrom, alert);
 
             return true;
         }
@@ -1091,10 +1246,26 @@ public class SocialPerson {
         return false;
     }
 
+    public void removeAllAlerts() {
+
+        Lock lock = rwMessageQueueLock.writeLock();
+        lock.lock();
+        try {
+
+            String className = Alert.class.getCanonicalName();
+            if (person.getMessageQueue().containsKey(className)) {
+                person.getMessageQueue().remove(className);
+            }
+
+        } finally {
+            lock.unlock();
+        }
+    }
+
     public boolean removeAlert(SocialPerson playerFrom, Alert.Type alertType) {
 
         // get the alert messages from the player
-        List<Alert> alerts = getMessagesFrom(playerFrom, Alert.class);
+        List<Alert> alerts = getMessagesFrom(playerFrom, Alert.class, false);
 
         // check to see if the person has sent them a alert of this type
         for (Alert alert : alerts) {
@@ -1102,7 +1273,7 @@ public class SocialPerson {
             if (alert.getAlertType() == alertType) {
 
                 // okay, now we want to remove this from the list
-                removeMessage(playerFrom.getName(), alert);
+                removeMessage(playerFrom, alert);
 
                 return true;
             }
@@ -1114,7 +1285,7 @@ public class SocialPerson {
     public boolean hasAlert(SocialPerson playerFrom, Alert.Type alertType) {
 
         // get the alert messages from the player
-        List<Alert> alerts = getMessagesFrom(playerFrom, Alert.class);
+        List<Alert> alerts = getMessagesFrom(playerFrom, Alert.class, false);
 
         // check to see if the person has sent them a alert of this type
         for (Alert alert : alerts) {
@@ -1128,54 +1299,137 @@ public class SocialPerson {
     }
 
     /**
-     * Checks to see if inGroupPerson is in playerPerson's social groups.
-     * @param playerPerson The person to search within.
-     * @param memberPerson The person to search for.
-     * @return True if found, false if not.
+     * Determines if this person has any group members at all in any group.
+     * @return true/false.
      */
-    public <U extends IPerkSettings> boolean isPerkMember(U perkSettings, SocialPerson memberPerson) {
+    public boolean hasGroupMembers() {
 
-        if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-            logger.info("Calling isPerkMember for: " + perkSettings.getName() + ", " + memberPerson.getName());
+        if (person.getFriends().size() > 0) {
+            return true;
         }
 
+        if (person.getAffairs().size() > 0) {
+            return true;
+        }
+
+        if (person.getRelationships().size() > 0) {
+            return true;
+        }
+
+        if (person.getChildOf() != null) {
+            return true;
+        }
+
+        if (person.getEngagement() != null) {
+            return true;
+        }
+
+        if (person.getDivorce() != null) {
+            return true;
+        }
+
+        if (person.getMarriage() != null) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Determine's if the given memberPerson belongs to ANY of this persons groups without caring about which one.
+     * This would typically be used for doing a non-perk validation that a player is in their groups.
+     * For Perk validations, please use hasGroupMemberWithPerk instead.
+     * @param memberPerson
+     * @return
+     */
+    public boolean hasGroupMember(SocialPerson memberPerson) {
+
+        if (isFriendWith(memberPerson)) {
+            return true;
+        }
+
+        if (isAffairWith(memberPerson)) {
+            return true;
+        }
+
+        if (isRelationshipWith(memberPerson)) {
+            return true;
+        }
+
+        if (getChildOf() != null && getChildOf().equals(memberPerson.getName())) {
+            return true;
+        }
+
+        if (isParentOf(memberPerson)) {
+            return true;
+        }
+
+        if (isEngagedTo(memberPerson)) {
+            return true;
+        }
+
+        if (isMarriedTo(memberPerson)) {
+            return true;
+        }
+
+        if (isDivorcedFrom(memberPerson)) {
+            return true;
+        }
+
+        // if both players are lawyers
+        if (isLawyer() && memberPerson.isLawyer()) {
+            return true;
+        }
+
+        // if both players are priests
+        if (isPriest() && memberPerson.isPriest()) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Checks to see if memberPerson belongs to any of this persons groups that contain the given perk.
+     * @param memberPerson The person to search for belonging to a group with that Perk.
+     * @param perkSettings The Perk settings containing the Perk we want to check for.
+     * @return True if found, false if not.
+     */
+    public <U extends IPerkSettings> boolean hasGroupMemberWithPerk(SocialPerson memberPerson, U perkSettings) {
+
+        SocialNetworkPlugin.log("Calling isPerkMember for: " + perkSettings.getName() + ", " + memberPerson.getName());
+
         // get the settings
-        SettingsConfig settingsConfig = PluginConfig.getInstance().getConfig(SettingsConfig.class);
+        SettingsConfig settingsConfig = SocialNetworkPlugin.getSettings();
 
         // go through each perk assigned to this group and see if any of them match the one from the perk settings given
-        if (isFriendWith(memberPerson.getName())) {
+        if (isFriendWith(memberPerson)) {
             FriendSettings settings = settingsConfig.getSocialNetworkSettings(FriendSettings.class);
             for (String perkName : settings.getPerks()) {
                 if (perkSettings.getName().equals(perkName)) {
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("Friend has perk: " + perkName);
-                    }
+                    SocialNetworkPlugin.log("Friend has perk: " + perkName);
                     return true;
                 }
             }
         }
 
         // go through each perk assigned to this group and see if any of them match the one from the perk settings given
-        if (isAffairWith(memberPerson.getName())) {
+        if (isAffairWith(memberPerson)) {
             AffairSettings settings = settingsConfig.getSocialNetworkSettings(AffairSettings.class);
             for (String perkName : settings.getPerks()) {
                 if (perkSettings.getName().equals(perkName)) {
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("Affair has perk: " + perkName);
-                    }
+                    SocialNetworkPlugin.log("Affair has perk: " + perkName);
                     return true;
                 }
             }
         }
 
         // go through each perk assigned to this group and see if any of them match the one from the perk settings given
-        if (isRelationshipWith(memberPerson.getName())) {
+        if (isRelationshipWith(memberPerson)) {
             RelationshipSettings settings = settingsConfig.getSocialNetworkSettings(RelationshipSettings.class);
             for (String perkName : settings.getPerks()) {
                 if (perkSettings.getName().equals(perkName)) {
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("Relationship has perk: " + perkName);
-                    }
+                    SocialNetworkPlugin.log("Relationship has perk: " + perkName);
                     return true;
                 }
             }
@@ -1186,9 +1440,7 @@ public class SocialPerson {
             ChildSettings settings = settingsConfig.getSocialNetworkSettings(ChildSettings.class);
             for (String perkName : settings.getPerks()) {
                 if (perkSettings.getName().equals(perkName)) {
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("Child has perk: " + perkName);
-                    }
+                    SocialNetworkPlugin.log("Child has perk: " + perkName);
                     return true;
                 }
             }
@@ -1199,9 +1451,7 @@ public class SocialPerson {
             EngagementSettings settings = settingsConfig.getSocialNetworkSettings(EngagementSettings.class);
             for (String perkName : settings.getPerks()) {
                 if (perkSettings.getName().equals(perkName)) {
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("Engagement has perk: " + perkName);
-                    }
+                    SocialNetworkPlugin.log("Engagement has perk: " + perkName);
                     return true;
                 }
             }
@@ -1212,9 +1462,7 @@ public class SocialPerson {
             MarriageSettings settings = settingsConfig.getSocialNetworkSettings(MarriageSettings.class);
             for (String perkName : settings.getPerks()) {
                 if (perkSettings.getName().equals(perkName)) {
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("Marriage has perk: " + perkName);
-                    }
+                    SocialNetworkPlugin.log("Marriage has perk: " + perkName);
                     return true;
                 }
             }
@@ -1224,76 +1472,52 @@ public class SocialPerson {
         if (getDivorce() != null && getDivorce().getPlayerName().equals(memberPerson.getName())) {
             DivorceSettings settings = settingsConfig.getSocialNetworkSettings(DivorceSettings.class);
             for (String perkName : settings.getPerks()) {
-                if (perkSettings.getName().equals(perkName)) {
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("Divorce has perk: " + perkName);
-                    }
-                    return true;
-                }
+                SocialNetworkPlugin.log("Divorce has perk: " + perkName);
+                return true;
             }
         }
 
-        if (isLawyer()) {
+        // if both players are lawyers
+        if (isLawyer() && memberPerson.isLawyer()) {
             LawyerSettings settings = settingsConfig.getSocialNetworkSettings(LawyerSettings.class);
             for (String perkName : settings.getPerks()) {
                 if (perkSettings.getName().equals(perkName)) {
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("Lawyer has perk: " + perkName);
-                    }
+                    SocialNetworkPlugin.log("Lawyer has perk: " + perkName);
                     return true;
                 }
             }
         }
 
-        if (isPriest()) {
+        // if both players are priests
+        if (isPriest() && memberPerson.isPriest()) {
             PriestSettings settings = settingsConfig.getSocialNetworkSettings(PriestSettings.class);
             for (String perkName : settings.getPerks()) {
                 if (perkSettings.getName().equals(perkName)) {
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("Priest has perk: " + perkName);
-                    }
+                    SocialNetworkPlugin.log("Priest has perk: " + perkName);
                     return true;
                 }
             }
         }
 
-        if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-            logger.info("NOMATCH isPerkMember for: " + perkSettings.getName() + ", " + memberPerson.getName());
-        }
+        SocialNetworkPlugin.log("NOMATCH isPerkMember for: " + perkSettings.getName() + ", " + memberPerson.getName());
 
         return false;
     }
 
     /**
-     * Gets a specific group settings instance. If the user does not belong to that group, it will return NULL.
-     * @param classObject The class of the settings to request.
-     * @return NULL if user does not belong to that group.
+     * Determines if this person belongs to the given group settings class.
+     * @param groupSettings The group settings class to check for.
+     * @return true/false.
      */
-    @SuppressWarnings("unchecked")
-    public <T extends GroupSettings> T getGroupSettings(Class<T> classObject) {
+    public <U extends GroupSettings> boolean hasGroupSettings(U groupSettings) {
 
-        return (T) buildGroupSettingsMap().get(classObject);
+        return settingsMap.containsKey(groupSettings.getClass());
     }
 
-    /**
-     * @return A list of group settings for the groups the user currently belongs to.
-     */
-    public List<GroupSettings> getGroupSettings() {
-
-        Map<Class<? extends GroupSettings>, ? extends GroupSettings> settingsMap = buildGroupSettingsMap();
-
-        List<GroupSettings> list = new ArrayList<GroupSettings>();
-        list.addAll(settingsMap.values());
-        return list;
-    }
-
-    private Map<Class<? extends GroupSettings>, ? extends GroupSettings> buildGroupSettingsMap() {
-
-        Map<Class<? extends GroupSettings>, GroupSettings> settingsMap =
-                new HashMap<Class<? extends GroupSettings>, GroupSettings>();
+    private Map<Class<? extends GroupSettings>, ? extends GroupSettings> generateGroupSettingsMap() {
 
         // get the settings
-        SettingsConfig settingsConfig = PluginConfig.getInstance().getConfig(SettingsConfig.class);
+        SettingsConfig settingsConfig = SocialNetworkPlugin.getSettings();
 
         if (person.getFriends().size() > 0) {
             FriendSettings settings = settingsConfig.getSocialNetworkSettings(FriendSettings.class);
@@ -1343,8 +1567,42 @@ public class SocialPerson {
         return settingsMap;
     }
 
+    private void generateSocialMappings() {
+
+        for (Friend friend : person.getFriends().values()) {
+            friends.put(friend.getPlayerName(), new SocialFriend(friend));
+        }
+
+        for (Child child : person.getChildren().values()) {
+            children.put(child.getPlayerName(), new SocialChild(child));
+        }
+
+        for (Affair affair : person.getAffairs().values()) {
+            affairs.put(affair.getPlayerName(), new SocialAffair(affair));
+        }
+
+        for (Relationship relationship : person.getRelationships().values()) {
+            relationships.put(relationship.getPlayerName(), new SocialRelationship(relationship));
+        }
+
+        if (person.getEngagement() != null) {
+            socialEngagement = new SocialEngagement(person.getEngagement());
+        }
+
+        if (person.getMarriage() != null) {
+            socialMarriage = new SocialMarriage(person.getMarriage());
+        }
+
+        if (person.getDivorce() != null) {
+            socialDivorce = new SocialDivorce(person.getDivorce());
+        }
+    }
+
     private void firePlayerMemberChangeEvent(String memberName, ICommandType groupType, Type eventType,
             boolean groupEmpty) {
+
+        // regenerate the settings map since something changed
+        generateGroupSettingsMap();
 
         // create the event
         PlayerMemberChangeEvent event =

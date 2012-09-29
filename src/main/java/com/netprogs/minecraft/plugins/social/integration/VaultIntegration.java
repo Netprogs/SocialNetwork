@@ -1,28 +1,23 @@
 package com.netprogs.minecraft.plugins.social.integration;
 
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.command.ISocialNetworkCommand.ICommandType;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
-import com.netprogs.minecraft.plugins.social.config.settings.SettingsConfig;
 
 import net.milkbowl.vault.economy.Economy;
+import net.milkbowl.vault.economy.EconomyResponse;
 import net.milkbowl.vault.permission.Permission;
 
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.RegisteredServiceProvider;
 
 /*
  * Copyright (C) 2012 Scott Milne
- * 
- * "Social Network" is a Craftbukkit Minecraft server modification plug-in. It attempts to add a 
- * social environment to your server by allowing players to be placed into different types of social groups.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -40,31 +35,25 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 
 public class VaultIntegration extends PluginIntegration {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
+    private String basePermissionPath;
     private boolean isPluginLoaded = false;
 
-    private PluginDescriptionFile pdfFile;
     private Economy economy = null;
     private Permission permission = null;
 
-    private static final VaultIntegration SINGLETON = new VaultIntegration();
-
-    public static VaultIntegration getInstance() {
-        return SINGLETON;
+    public VaultIntegration(Plugin plugin, String basePermissionPath, boolean isLoggingDebug) {
+        super(plugin, isLoggingDebug);
+        this.basePermissionPath = basePermissionPath;
     }
 
     @Override
-    public void initialize(Plugin plugin) {
+    public void initialize() {
 
         isPluginLoaded = false;
 
-        // get the plug-in description file
-        pdfFile = plugin.getDescription();
-
         // first we need to check to see if Vault is actually installed
         if (Bukkit.getServer().getPluginManager().getPlugin("Vault") == null) {
-            logger.log(Level.SEVERE, getPluginName() + "Vault is not installed.");
+            getPlugin().getLogger().log(Level.SEVERE, "Vault is not installed.");
             return;
         }
 
@@ -75,11 +64,14 @@ public class VaultIntegration extends PluginIntegration {
         if (economyProvider != null) {
 
             economy = (Economy) economyProvider.getProvider();
-            logger.info(getPluginName() + "Vault:Economy integration successful.");
+
+            if (isLoggingDebug()) {
+                getPlugin().getLogger().info("Vault:Economy integration successful.");
+            }
 
         } else {
 
-            logger.log(Level.SEVERE, getPluginName() + "Could not obtain an Economy integration from Vault.");
+            getPlugin().getLogger().log(Level.SEVERE, "Could not obtain an Economy integration from Vault.");
             return;
         }
 
@@ -90,14 +82,16 @@ public class VaultIntegration extends PluginIntegration {
         if (permissionProvider != null) {
 
             permission = (Permission) permissionProvider.getProvider();
-            logger.info(getPluginName() + "Vault:Permission integration successful.");
+
+            if (isLoggingDebug()) {
+                getPlugin().getLogger().info("Vault:Permission integration successful.");
+            }
 
         } else {
 
-            logger.log(Level.SEVERE, getPluginName() + "Could not obtain a Permission integration from Vault.");
+            getPlugin().getLogger().log(Level.SEVERE, "Could not obtain a Permission integration from Vault.");
             return;
         }
-
         // set the isPluginLoaded flag
         isPluginLoaded = true;
 
@@ -115,8 +109,8 @@ public class VaultIntegration extends PluginIntegration {
         return true;
     }
 
-    private String getPluginName() {
-        return "[" + pdfFile.getName() + "] ";
+    public String getBasePermissionPath() {
+        return basePermissionPath;
     }
 
     /**
@@ -126,6 +120,8 @@ public class VaultIntegration extends PluginIntegration {
     public Economy getEconomy() {
         return economy;
     }
+
+    // TODO: Remove calling of Vault for permission. Just use player.hasPermission instead and place into main class.
 
     /**
      * Since this is a required integration, we can safely expose the Permission instance within it.
@@ -139,25 +135,21 @@ public class VaultIntegration extends PluginIntegration {
         return hasCommandPermission(sender, commandType.toString());
     }
 
-    public boolean hasCommandPermission(CommandSender sender, ICommandType commandType, String subCommandPath) {
-        return hasCommandPermission(sender, commandType + subCommandPath);
-    }
-
     public boolean hasCommandPermission(CommandSender sender, String permissionPath) {
 
-        String path = "social." + permissionPath;
+        String path = getBasePermissionPath() + "." + permissionPath;
 
         boolean hasPermission = permission.has(sender, path);
         if (hasPermission) {
 
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info(sender.getName() + " has the permission: " + path);
+            if (isLoggingDebug()) {
+                getPlugin().getLogger().info(sender.getName() + " has the permission: " + path);
             }
 
         } else {
 
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info(sender.getName() + " does not have the permission: " + path);
+            if (isLoggingDebug()) {
+                getPlugin().getLogger().info(sender.getName() + " does not have the permission: " + path);
             }
         }
 
@@ -166,16 +158,10 @@ public class VaultIntegration extends PluginIntegration {
 
     public boolean preAuthCommandPurchase(Player player, double price) {
 
-        if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-            logger.info("[PreAuth] Found command price: " + price);
-        }
+        SocialNetworkPlugin.log("[PreAuthCommandPurchase] Found command price: " + price);
 
         // now check to see if they have enough money to run the perk
-        if (!economy.has(player.getName(), price)) {
-
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("[PreAuth] Not enough funds for command: " + price);
-            }
+        if (!preAuth(player, price)) {
 
             // they don't, so tell them
             MessageUtil.sendNotEnoughFundsMessage(player, price);
@@ -188,19 +174,19 @@ public class VaultIntegration extends PluginIntegration {
     public boolean processCommandPurchase(Player player, double price) {
 
         // now check to see if they have enough money to run the perk
-        if (economy.has(player.getName(), price)) {
+        if (preAuth(player, price)) {
 
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("[purchase] Charging command price: " + price);
+            if (isLoggingDebug()) {
+                getPlugin().getLogger().info("[processCommandPurchase] Charging command price: " + price);
             }
 
             // do the actual purchase now
-            economy.withdrawPlayer(player.getName(), price);
+            withdraw(player, price);
 
         } else {
 
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("[purchase] Not enough funds for command: " + price);
+            if (isLoggingDebug()) {
+                getPlugin().getLogger().info("[processCommandPurchase] Not enough funds for command: " + price);
             }
 
             // Despite us checking earlier, they seem to have run out of money. Tell them.
@@ -209,5 +195,82 @@ public class VaultIntegration extends PluginIntegration {
         }
 
         return true;
+    }
+
+    public boolean preAuth(Player player, double price) {
+
+        if (isLoggingDebug()) {
+            getPlugin().getLogger().info("[PreAuth] price: " + price);
+        }
+
+        // now check to see if they have enough money
+        if (!economy.has(player.getName(), price)) {
+
+            if (isLoggingDebug()) {
+                getPlugin().getLogger().info("[PreAuth] Not enough funds: " + price);
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    public boolean withdraw(Player player, double payment) {
+
+        // now check to see if they have enough money
+        if (economy.has(player.getName(), payment)) {
+
+            if (isLoggingDebug()) {
+                getPlugin().getLogger().info("[withdraw] Charging: " + payment);
+            }
+
+            // do the actual withdraw now
+            EconomyResponse response = economy.withdrawPlayer(player.getName(), payment);
+            if (response.transactionSuccess()) {
+
+                if (isLoggingDebug()) {
+                    getPlugin().getLogger().info("[withdraw]: " + payment);
+                }
+
+            } else {
+
+                if (isLoggingDebug()) {
+                    getPlugin().getLogger().info("[withdraw] failed: " + response.errorMessage);
+                }
+
+                // Something went wrong when trying to get their money
+                return false;
+            }
+
+        } else {
+
+            if (isLoggingDebug()) {
+                getPlugin().getLogger().info("[withdraw] Not enough funds: " + payment);
+            }
+
+            // They seem to have run out of money.
+            return false;
+        }
+
+        return true;
+    }
+
+    public void deposit(Player player, double payment) {
+
+        // put the payment onto the players account
+        EconomyResponse response = economy.depositPlayer(player.getName(), payment);
+        if (response.transactionSuccess()) {
+
+            if (isLoggingDebug()) {
+                getPlugin().getLogger().info("[deposit]: " + payment);
+            }
+
+        } else {
+
+            if (isLoggingDebug()) {
+                getPlugin().getLogger().info("[deposit] failed: " + response.errorMessage);
+            }
+        }
     }
 }

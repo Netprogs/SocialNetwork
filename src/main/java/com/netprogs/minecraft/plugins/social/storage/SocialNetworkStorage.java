@@ -1,13 +1,16 @@
 package com.netprogs.minecraft.plugins.social.storage;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
+import java.util.TimeZone;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
+import com.netprogs.minecraft.plugins.social.command.util.PlayerUtil;
+import com.netprogs.minecraft.plugins.social.command.util.TimerManager;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.storage.data.Alert;
 import com.netprogs.minecraft.plugins.social.storage.data.Person;
@@ -38,11 +41,7 @@ import org.bukkit.entity.Player;
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 
-public class SocialNetwork {
-
-    private final Logger logger = Logger.getLogger("Minecraft");
-
-    private static final SocialNetwork SINGLETON = new SocialNetwork();
+public class SocialNetworkStorage {
 
     private class PersonMapValue {
 
@@ -77,11 +76,7 @@ public class SocialNetwork {
     // This helps control memory a bit better since we'll only be storing those who are active.
     private Map<String, PersonMapValue> loadedPersonMap;
 
-    public static SocialNetwork getInstance() {
-        return SINGLETON;
-    }
-
-    private SocialNetwork() {
+    public SocialNetworkStorage() {
 
         // create our data manager instances
         // later on we should be able to "hot-swap" these with other forms of data managers (mysql, sqlite etc)
@@ -103,17 +98,18 @@ public class SocialNetwork {
         return loadedPersonMap;
     }
 
-    // Used by listeners to determine right away if they're handling a player from the network
-    public boolean isSocialNetworkPlayer(Player player) {
-        return getSocialNetworkMap().containsKey(player.getName().toLowerCase());
-    }
+    // Used by PlayerJoinListener to create accounts upon login
+    public synchronized SocialPerson addPerson(Player player) {
 
-    // Used by CommandJoin
-    public synchronized SocialPerson addPerson(String playerName) {
+        // We need to check the excludedPlayers list and if they are here, return null
+        if (SocialNetworkPlugin.getStorage().isExcludedPlayer(player.getName())) {
+            return null;
+        }
 
         // create the person data
         Person person = new Person();
-        person.setName(playerName);
+        person.setName(player.getName());
+        person.setDateJoined(System.currentTimeMillis());
 
         SocialPerson socialPerson = new SocialPerson(person);
 
@@ -133,7 +129,6 @@ public class SocialNetwork {
         return socialPerson;
     }
 
-    // Used by CommandQuit
     public void removePerson(SocialPerson socialPerson) {
 
         synchronized (socialPerson) {
@@ -169,84 +164,118 @@ public class SocialNetwork {
 
     public synchronized SocialPerson getPerson(String personName) {
 
-        // Do the lazy load here. Check to see if they've been loaded from file yet, if not, so it now.
-        if (getSocialNetworkMap().get(personName.toLowerCase()) == null) {
+        // Take the name given and look up their real name from Bukkit
+        // This should allow people to use any nicknames also for sending requests.
+        // Visually however, we're still going to use their real names.
+        String playerName = PlayerUtil.getPlayerName(personName);
+        if (playerName != null) {
 
-            // load their data from the data manager
-            Person person = personDataManager.loadPerson(personName);
-            if (person != null) {
+            // Do the lazy load here. Check to see if they've been loaded from file yet, if not, so it now.
+            if (getSocialNetworkMap().get(playerName.toLowerCase()) == null) {
 
-                // add their name to the data source if they're not there yet
-                // (case of new player being loaded for the first time)
-                if (!socialDataManager.hasPlayer(person.getName())) {
-                    socialDataManager.addPlayer(person.getName());
+                // load their data from the data manager
+                Person person = personDataManager.loadPerson(playerName);
+                if (person != null) {
+
+                    // add their name to the data source if they're not there yet
+                    // (case of new player being loaded for the first time)
+                    if (!socialDataManager.hasPlayer(person.getName())) {
+                        socialDataManager.addPlayer(person.getName());
+                    }
+
+                    // TODO: We should be able to remove this eventually and force people to update
+                    // We now want to check to see if they have a valid join date
+                    // This is only used for older versions that did not have this value previously.
+                    if (person.getDateJoined() == 0) {
+                        person.setDateJoined(System.currentTimeMillis());
+                        personDataManager.savePerson(person);
+                    }
+
+                    // now wrap them in our SocialPerson object
+                    SocialPerson socialPerson = new SocialPerson(person);
+                    PersonMapValue value = new PersonMapValue(socialPerson, person);
+
+                    // add to the map using lower case name as key
+                    getSocialNetworkMap().put(person.getName().toLowerCase(), value);
+
+                    // return the new instance
+                    // SocialNetworkPlugin.log("getPerson returning: " + socialPerson.getName());
+                    return socialPerson;
                 }
 
-                // now wrap them in our SocialPerson object
-                SocialPerson socialPerson = new SocialPerson(person);
-                PersonMapValue value = new PersonMapValue(socialPerson, person);
+            } else {
 
-                // add to the map using lower case name as key
-                getSocialNetworkMap().put(person.getName().toLowerCase(), value);
-
-                // return the new instance
-                return getSocialNetworkMap().get(personName.toLowerCase()).getSocialPerson();
+                // we found them in the network list, so return their object
+                SocialPerson socialPerson = getSocialNetworkMap().get(playerName.toLowerCase()).getSocialPerson();
+                // SocialNetworkPlugin.log("getPerson returning: " + socialPerson.getName());
+                return socialPerson;
             }
-
-        } else {
-
-            // we found them in the network list, so return their object
-            return getSocialNetworkMap().get(personName.toLowerCase()).getSocialPerson();
         }
 
         // nothing found
+        SocialNetworkPlugin.log("getPerson cannot find: " + personName);
         return null;
+    }
+
+    public boolean isExcludedPlayer(String playerName) {
+        return socialDataManager.isExcludedPlayer(playerName);
+    }
+
+    public void addExcludedPlayer(SocialPerson socialPerson) {
+        socialDataManager.addExcludedPlayer(socialPerson.getName());
+    }
+
+    public void removeExcludedPlayer(String playerName) {
+        socialDataManager.removeExcludedPlayer(playerName);
     }
 
     public List<String> getPriests() {
         return new ArrayList<String>(socialDataManager.getPriests());
     }
 
-    public boolean hasPriest(String playerName) {
-        return socialDataManager.hasPriest(playerName);
+    public boolean hasPriest(SocialPerson socialPerson) {
+        return socialDataManager.hasPriest(socialPerson.getName());
     }
 
-    public void addPriest(String playerName) {
-        socialDataManager.addPriest(playerName);
+    public void addPriest(SocialPerson socialPerson) {
+        socialDataManager.addPriest(socialPerson.getName());
     }
 
-    public void removePriest(String playerName) {
-        socialDataManager.removePriest(playerName);
+    public void removePriest(SocialPerson socialPerson) {
+        socialDataManager.removePriest(socialPerson.getName());
     }
 
     public List<String> getLawyers() {
         return new ArrayList<String>(socialDataManager.getLawyers());
     }
 
-    public boolean hasLawyer(String playerName) {
-        return socialDataManager.hasLawyer(playerName);
+    public boolean hasLawyer(SocialPerson socialPerson) {
+        return socialDataManager.hasLawyer(socialPerson.getName());
     }
 
-    public void addLawyer(String playerName) {
-        socialDataManager.addLawyer(playerName);
+    public void addLawyer(SocialPerson socialPerson) {
+        socialDataManager.addLawyer(socialPerson.getName());
     }
 
-    public void removeLawyer(String playerName) {
-        socialDataManager.removeLawyer(playerName);
+    public void removeLawyer(SocialPerson socialPerson) {
+        socialDataManager.removeLawyer(socialPerson.getName());
     }
 
-    public <P extends IPersonPerkSettings> P getPersonPerkSettings(String personName, String perkName) {
+    public <P extends IPersonPerkSettings> P getPersonPerkSettings(SocialPerson socialPerson, String perkName) {
 
-        PersonSettings settings = personDataManager.loadPersonSettings(personName);
+        Person person = getSocialNetworkMap().get(socialPerson.getName().toLowerCase()).getPerson();
+        PersonSettings settings = personDataManager.loadPersonSettings(person);
         if (settings != null && settings.hasPerkSettings(perkName)) {
             return settings.getPerkSettings(perkName);
         }
         return null;
     }
 
-    public <P extends IPersonPerkSettings> void setPersonPerkSettings(String personName, String perkName, P perkSettings) {
+    public <P extends IPersonPerkSettings> void setPersonPerkSettings(SocialPerson socialPerson, String perkName,
+            P perkSettings) {
 
-        PersonSettings settings = personDataManager.loadPersonSettings(personName);
+        Person person = getSocialNetworkMap().get(socialPerson.getName().toLowerCase()).getPerson();
+        PersonSettings settings = personDataManager.loadPersonSettings(person);
         if (settings != null) {
             settings.setPerkSettings(perkName, perkSettings);
         } else {
@@ -255,10 +284,55 @@ public class SocialNetwork {
         }
 
         // save it
-        personDataManager.savePersonSettings(personName, settings);
+        personDataManager.savePersonSettings(person, settings);
     }
 
-    private void removeFromAllGroups(SocialPerson socialPerson) {
+    public int purgePlayers(int purgeDays) {
+
+        SimpleDateFormat dayFormat = new SimpleDateFormat("D");
+        dayFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+        // convert the days into milliseconds
+        long purgeDaysTime = purgeDays * 24L * 60L * 60L * 1000L;
+
+        // get todays time and subtract the purge days
+        long purgeTime = System.currentTimeMillis() - purgeDaysTime;
+
+        SocialNetworkPlugin.logger().info("[PURGE] Starting the purge of old accounts...");
+        SocialNetworkPlugin.logger().info("[PURGE] Purging accounts older than: " + TimerManager.formatDate(purgeTime));
+
+        // get the list of players and for each one, determine when they last logged in
+        int purgeCount = 0;
+        for (String playerName : socialDataManager.getPlayers()) {
+
+            // get the last login time and convert into days
+            long lastLoginTime = PlayerUtil.getPlayerLastPlayed(playerName);
+
+            SocialNetworkPlugin.logger().info(
+                    "[PURGE] Checking " + playerName + ": " + TimerManager.formatDate(lastLoginTime));
+
+            if (lastLoginTime < purgeTime) {
+
+                // obtain their details, then delete their account
+                SocialPerson purgePerson = getPerson(playerName);
+                removePerson(purgePerson);
+
+                SocialNetworkPlugin.logger().info(
+                        "[PURGE] Purged account " + playerName + " with last login: "
+                                + TimerManager.formatDate(lastLoginTime));
+            }
+        }
+
+        SocialNetworkPlugin.logger().info("[PURGE] Purged " + purgeCount + " accounts.");
+
+        return purgeCount;
+    }
+
+    public Map<String, SocialPerson> getNotificationPlayers(SocialPerson socialPerson) {
+        return getNotificationPlayers(socialPerson, false);
+    }
+
+    private Map<String, SocialPerson> getNotificationPlayers(SocialPerson socialPerson, boolean remove) {
 
         Map<String, SocialPerson> notifyPlayers = new HashMap<String, SocialPerson>();
 
@@ -268,7 +342,9 @@ public class SocialNetwork {
         for (String memberName : person.getFriends().keySet()) {
             SocialPerson groupPerson = getPerson(memberName);
             if (groupPerson != null) {
-                groupPerson.removeFriend(person.getName());
+                if (remove) {
+                    groupPerson.removeFriend(socialPerson);
+                }
                 notifyPlayers.put(groupPerson.getName(), groupPerson);
             }
         }
@@ -276,7 +352,9 @@ public class SocialNetwork {
         for (String memberName : person.getAffairs().keySet()) {
             SocialPerson groupPerson = getPerson(memberName);
             if (groupPerson != null) {
-                groupPerson.removeAffair(person.getName());
+                if (remove) {
+                    groupPerson.removeAffair(socialPerson);
+                }
                 notifyPlayers.put(groupPerson.getName(), groupPerson);
             }
         }
@@ -284,7 +362,9 @@ public class SocialNetwork {
         for (String memberName : person.getRelationships().keySet()) {
             SocialPerson groupPerson = getPerson(memberName);
             if (groupPerson != null) {
-                groupPerson.removeRelationship(person.getName());
+                if (remove) {
+                    groupPerson.removeRelationship(socialPerson);
+                }
                 notifyPlayers.put(groupPerson.getName(), groupPerson);
             }
         }
@@ -292,7 +372,9 @@ public class SocialNetwork {
         for (String memberName : person.getRelationships().keySet()) {
             SocialPerson groupPerson = getPerson(memberName);
             if (groupPerson != null) {
-                groupPerson.removeRelationship(person.getName());
+                if (remove) {
+                    groupPerson.removeRelationship(socialPerson);
+                }
                 notifyPlayers.put(groupPerson.getName(), groupPerson);
             }
         }
@@ -300,7 +382,9 @@ public class SocialNetwork {
         for (String memberName : person.getChildren().keySet()) {
             SocialPerson groupPerson = getPerson(memberName);
             if (groupPerson != null) {
-                groupPerson.breakChildOf();
+                if (remove) {
+                    groupPerson.breakChildOf();
+                }
                 notifyPlayers.put(groupPerson.getName(), groupPerson);
             }
         }
@@ -308,7 +392,9 @@ public class SocialNetwork {
         if (person.getChildOf() != null) {
             SocialPerson groupPerson = getPerson(person.getChildOf());
             if (groupPerson != null) {
-                groupPerson.removeChild(person.getName());
+                if (remove) {
+                    groupPerson.removeChild(socialPerson);
+                }
                 notifyPlayers.put(groupPerson.getName(), groupPerson);
             }
         }
@@ -316,7 +402,9 @@ public class SocialNetwork {
         if (person.getEngagement() != null) {
             SocialPerson groupPerson = getPerson(person.getEngagement().getPlayerName());
             if (groupPerson != null) {
-                groupPerson.breakEngagement();
+                if (remove) {
+                    groupPerson.breakEngagement();
+                }
                 notifyPlayers.put(groupPerson.getName(), groupPerson);
             }
         }
@@ -324,7 +412,9 @@ public class SocialNetwork {
         if (person.getDivorce() != null) {
             SocialPerson groupPerson = getPerson(person.getDivorce().getPlayerName());
             if (groupPerson != null) {
-                groupPerson.endDivorce();
+                if (remove) {
+                    groupPerson.endDivorce();
+                }
                 notifyPlayers.put(groupPerson.getName(), groupPerson);
             }
         }
@@ -332,22 +422,33 @@ public class SocialNetwork {
         if (person.getMarriage() != null) {
             SocialPerson groupPerson = getPerson(person.getMarriage().getPlayerName());
             if (groupPerson != null) {
-                groupPerson.breakMarriage();
+                if (remove) {
+                    groupPerson.breakMarriage();
+                }
                 notifyPlayers.put(groupPerson.getName(), groupPerson);
             }
         }
 
+        return notifyPlayers;
+    }
+
+    private void removeFromAllGroups(SocialPerson socialPerson) {
+
+        // get the list of all unique player among all your groups
+        Map<String, SocialPerson> notifyPlayers = getNotificationPlayers(socialPerson, true);
+
         // now, for each person in the map, send them an alert saying this person quit
-        ResourcesConfig resources = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
-        String alertMessage = resources.getResource("social.alert.playerLeftNetwork");
+        ResourcesConfig resources = SocialNetworkPlugin.getResources();
+        String alertMessage = resources.getResource("social.alert.playerDeleted");
+        alertMessage = alertMessage.replaceAll("<player>", socialPerson.getName());
 
         for (SocialPerson memberPerson : notifyPlayers.values()) {
 
             // remove all pending messages
-            memberPerson.removeMessagesFrom(socialPerson.getName());
+            memberPerson.removeMessagesFrom(socialPerson);
 
             // add the alert
-            memberPerson.addAlert(socialPerson, Alert.Type.quit, alertMessage);
+            memberPerson.addAlert(socialPerson, Alert.Type.deleted, alertMessage);
 
             // save the alert and the changes from above
             savePerson(memberPerson);

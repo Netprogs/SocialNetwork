@@ -1,22 +1,20 @@
 package com.netprogs.minecraft.plugins.social.command.group;
 
 import java.util.List;
-import java.util.logging.Logger;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.SocialPerson.Status;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommandType;
 import com.netprogs.minecraft.plugins.social.command.exception.ArgumentsMissingException;
 import com.netprogs.minecraft.plugins.social.command.exception.InvalidPermissionsException;
 import com.netprogs.minecraft.plugins.social.command.exception.PlayerNotInNetworkException;
+import com.netprogs.minecraft.plugins.social.command.help.HelpBook;
 import com.netprogs.minecraft.plugins.social.command.help.HelpMessage;
 import com.netprogs.minecraft.plugins.social.command.help.HelpSegment;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.command.util.TimerUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.group.MarriageSettings;
-import com.netprogs.minecraft.plugins.social.integration.VaultIntegration;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -43,8 +41,6 @@ import org.bukkit.entity.Player;
  */
 
 public class CommandMarriage extends GroupCommand<MarriageSettings> {
-
-    private final Logger logger = Logger.getLogger("Minecraft");
 
     public CommandMarriage() {
         super(SocialNetworkCommandType.marriage);
@@ -137,12 +133,7 @@ public class CommandMarriage extends GroupCommand<MarriageSettings> {
     protected boolean personInGroup(SocialPerson playerPerson, SocialPerson inGroupPerson) {
 
         // if the marriage object is valid and it's player is the same as the groupPerson given, then we have a match
-        if (playerPerson.getMarriage() != null
-                && playerPerson.getMarriage().getPlayerName().equalsIgnoreCase(inGroupPerson.getName())) {
-            return true;
-        }
-
-        return false;
+        return playerPerson.isMarriedTo(inGroupPerson);
     }
 
     /**
@@ -154,7 +145,7 @@ public class CommandMarriage extends GroupCommand<MarriageSettings> {
     protected void addPersonToGroup(SocialPerson playerPerson, SocialPerson addPerson) {
 
         // create and set the marriage to the playerPerson
-        playerPerson.createMarriage(addPerson.getName());
+        playerPerson.createMarriage(addPerson);
 
         // remove their engagement
         playerPerson.breakEngagement();
@@ -170,13 +161,14 @@ public class CommandMarriage extends GroupCommand<MarriageSettings> {
         int timer = settings.getHoneymoonPeriod();
 
         // update the timer for the command
-        TimerUtil.updateCommandTimer(playerPerson.getName(), SocialNetworkCommandType.marriage, timer);
+        SocialNetworkPlugin.getTimerManager().updateCommandTimer(playerPerson.getName(),
+                SocialNetworkCommandType.marriage, timer);
 
         // Charge the player for the cost of the divorce.
         // Ignore if they can't afford it (we already checked earlier)
         Player player = Bukkit.getServer().getPlayer(playerPerson.getName());
         if (player != null) {
-            VaultIntegration.getInstance().processCommandPurchase(player, settings.getPerUseCost());
+            SocialNetworkPlugin.getVault().processCommandPurchase(player, settings.getPerUseCost());
         }
     }
 
@@ -218,28 +210,45 @@ public class CommandMarriage extends GroupCommand<MarriageSettings> {
         // Marriage doesn't support list
     }
 
+    /**
+     * Provides the chance to display a help page to player who have been sent a request.
+     * @param receiver The player to receive the help message.
+     */
+    @Override
+    protected void displayRequestHelp(Player receiver) {
+
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
+
+        HelpMessage acceptCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "accept", "<player>",
+                        config.getResource("social.marriage.help.accept"));
+        MessageUtil.sendMessage(receiver, acceptCommand.display());
+
+        HelpMessage rejectCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "reject", "<player>",
+                        config.getResource("social.marriage.help.reject"));
+        MessageUtil.sendMessage(receiver, rejectCommand.display());
+    }
+
     @Override
     public HelpSegment help() {
 
         HelpSegment helpSegment = new HelpSegment(getCommandType());
-        ResourcesConfig config = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
 
-        HelpMessage mainCommand = new HelpMessage();
-        mainCommand.setCommand(getCommandType().toString());
-        mainCommand.setArguments("request <player>");
-        mainCommand.setDescription(config.getResource("social.marriage.help.request"));
+        HelpMessage mainCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "request", "<player>",
+                        config.getResource("social.marriage.help.request"));
         helpSegment.addEntry(mainCommand);
 
-        HelpMessage acceptCommand = new HelpMessage();
-        acceptCommand.setCommand(getCommandType().toString());
-        acceptCommand.setArguments("accept <player>");
-        acceptCommand.setDescription(config.getResource("social.marriage.help.accept"));
+        HelpMessage acceptCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "accept", "<player>",
+                        config.getResource("social.marriage.help.accept"));
         helpSegment.addEntry(acceptCommand);
 
-        HelpMessage rejectCommand = new HelpMessage();
-        rejectCommand.setCommand(getCommandType().toString());
-        rejectCommand.setArguments("reject <player>");
-        rejectCommand.setDescription(config.getResource("social.marriage.help.reject"));
+        HelpMessage rejectCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "reject", "<player>",
+                        config.getResource("social.marriage.help.reject"));
         helpSegment.addEntry(rejectCommand);
 
         return helpSegment;

@@ -31,9 +31,9 @@ public interface IPersonDataManager {
 
     public void deletePerson(Person person);
 
-    public PersonSettings loadPersonSettings(String personName);
+    public PersonSettings loadPersonSettings(Person person);
 
-    public void savePersonSettings(String personName, PersonSettings settings);
+    public void savePersonSettings(Person person, PersonSettings settings);
 
-    public void deletePersonSettings(String personName);
+    public void deletePersonSettings(Person person);
 }

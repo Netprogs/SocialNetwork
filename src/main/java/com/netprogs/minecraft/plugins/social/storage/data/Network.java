@@ -28,6 +28,7 @@ public class Network {
     // We only store here the names of each player that are in the network.
     // We use that name to reference their data files later on.
     private List<String> players = new ArrayList<String>();
+    private List<String> excludedPlayers = new ArrayList<String>();
     private List<String> priests = new ArrayList<String>();
     private List<String> lawyers = new ArrayList<String>();
 
@@ -41,5 +42,9 @@ public class Network {
 
     public List<String> getLawyers() {
         return lawyers;
+    }
+
+    public List<String> getExcludedPlayers() {
+        return excludedPlayers;
     }
 }

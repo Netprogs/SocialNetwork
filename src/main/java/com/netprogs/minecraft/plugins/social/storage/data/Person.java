@@ -40,6 +40,14 @@ public class Person {
     private Gender gender;
     private Status socialStatus;
 
+    private long dateJoined;
+
+    private String statusMessage;
+
+    private boolean statusUpdatesIgnored;
+    private boolean loginUpdatesIgnored;
+    private boolean genderChoiceRemindersIgnored;
+
     // <MessageClassName, <PlayerName, List<MessageInstance>>>
     private Map<String, Map<String, List<? extends IMessage>>> messageQueue =
             new HashMap<String, Map<String, List<? extends IMessage>>>();
@@ -207,5 +215,45 @@ public class Person {
 
     public void setIgnoreList(List<String> ignoreList) {
         this.ignoreList = ignoreList;
+    }
+
+    public long getDateJoined() {
+        return dateJoined;
+    }
+
+    public void setDateJoined(long dateJoined) {
+        this.dateJoined = dateJoined;
+    }
+
+    public String getStatusMessage() {
+        return statusMessage;
+    }
+
+    public void setStatusMessage(String statusMessage) {
+        this.statusMessage = statusMessage;
+    }
+
+    public boolean isStatusUpdatesIgnored() {
+        return statusUpdatesIgnored;
+    }
+
+    public void setStatusUpdatesIgnored(boolean statusUpdatesIgnored) {
+        this.statusUpdatesIgnored = statusUpdatesIgnored;
+    }
+
+    public boolean isLoginUpdatesIgnored() {
+        return loginUpdatesIgnored;
+    }
+
+    public void setLoginUpdatesIgnored(boolean loginUpdatesIgnored) {
+        this.loginUpdatesIgnored = loginUpdatesIgnored;
+    }
+
+    public boolean isGenderChoiceRemindersIgnored() {
+        return genderChoiceRemindersIgnored;
+    }
+
+    public void setGenderChoiceRemindersIgnored(boolean genderChoiceRemindersIgnored) {
+        this.genderChoiceRemindersIgnored = genderChoiceRemindersIgnored;
     }
 }

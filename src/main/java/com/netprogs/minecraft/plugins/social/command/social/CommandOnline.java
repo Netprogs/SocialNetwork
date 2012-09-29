@@ -1,11 +1,13 @@
 package com.netprogs.minecraft.plugins.social.command.social;
 
 import java.util.List;
+import java.util.Map;
 
 import com.netprogs.minecraft.plugins.social.SocialDivorce;
 import com.netprogs.minecraft.plugins.social.SocialEngagement;
 import com.netprogs.minecraft.plugins.social.SocialGroupMember;
 import com.netprogs.minecraft.plugins.social.SocialMarriage;
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommand;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommandType;
@@ -14,13 +16,13 @@ import com.netprogs.minecraft.plugins.social.command.exception.InvalidPermission
 import com.netprogs.minecraft.plugins.social.command.exception.PlayerNotInNetworkException;
 import com.netprogs.minecraft.plugins.social.command.exception.SenderNotInNetworkException;
 import com.netprogs.minecraft.plugins.social.command.exception.SenderNotPlayerException;
+import com.netprogs.minecraft.plugins.social.command.help.HelpBook;
 import com.netprogs.minecraft.plugins.social.command.help.HelpMessage;
 import com.netprogs.minecraft.plugins.social.command.help.HelpSegment;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.ISocialNetworkSettings;
-import com.netprogs.minecraft.plugins.social.storage.SocialNetwork;
+import com.netprogs.minecraft.plugins.social.storage.SocialNetworkStorage;
 
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
@@ -73,7 +75,7 @@ public class CommandOnline extends SocialNetworkCommand<ISocialNetworkSettings> 
         Player player = (Player) sender;
 
         // get the social network data
-        SocialNetwork socialConfig = SocialNetwork.getInstance();
+        SocialNetworkStorage socialConfig = SocialNetworkPlugin.getStorage();
 
         // check to see if the player is in the network
         SocialPerson person = socialConfig.getPerson(player.getName());
@@ -101,65 +103,51 @@ public class CommandOnline extends SocialNetworkCommand<ISocialNetworkSettings> 
             return false;
         }
 
+        ResourcesConfig resources = SocialNetworkPlugin.getResources();
+
         // Friends
-        String friendTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.online.tag.friend.sender");
+        String friendTag = resources.getResource("social.online.tag.friend.sender");
 
         displayPlayers(player, friendTag, person.getFriends());
 
         // Relationships
-        String relationshipTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.online.tag.relationship.sender");
+        String relationshipTag = resources.getResource("social.online.tag.relationship.sender");
 
         displayPlayers(player, relationshipTag, person.getRelationships());
 
         // Affairs
-        String affairTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.online.tag.affair.sender");
+        String affairTag = resources.getResource("social.online.tag.affair.sender");
 
         displayPlayers(player, affairTag, person.getAffairs());
 
         // Children
-        String childTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.online.tag.child.sender");
+        String childTag = resources.getResource("social.online.tag.child.sender");
 
         displayPlayers(player, childTag, person.getChildren());
 
         // Display the person that is your parent
-        String parentTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.online.tag.parent.sender");
+        String parentTag = resources.getResource("social.online.tag.parent.sender");
 
         if (childOf != null) {
             displayPlayer(player, parentTag, childOf);
         }
 
         // Display person engaged to
-        String engagementTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.online.tag.engagement.sender");
+        String engagementTag = resources.getResource("social.online.tag.engagement.sender");
 
         if (engagement != null) {
             displayPlayer(player, engagementTag, engagement.getPlayerName());
         }
 
         // Display person married to
-        String marriageTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.online.tag.marriage.sender");
+        String marriageTag = resources.getResource("social.online.tag.marriage.sender");
 
         if (marriage != null) {
             displayPlayer(player, marriageTag, marriage.getPlayerName());
         }
 
         // Display person divorced from
-        String divorseTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.online.tag.divorce.sender");
+        String divorseTag = resources.getResource("social.online.tag.divorce.sender");
 
         if (divorce != null) {
             displayPlayer(player, divorseTag, divorce.getPlayerName());
@@ -168,7 +156,7 @@ public class CommandOnline extends SocialNetworkCommand<ISocialNetworkSettings> 
         return true;
     }
 
-    private void displayPlayers(Player player, String groupPrefix, List<? extends SocialGroupMember> members) {
+    private void displayPlayers(Player player, String groupPrefix, Map<String, ? extends SocialGroupMember> members) {
 
         String displayPlayers = "";
         if (members.size() > 0) {
@@ -176,7 +164,7 @@ public class CommandOnline extends SocialNetworkCommand<ISocialNetworkSettings> 
             displayPlayers = ChatColor.GREEN + groupPrefix + " " + ChatColor.WHITE;
 
             // check to see if they are online
-            for (SocialGroupMember member : members) {
+            for (SocialGroupMember member : members.values()) {
                 Player friendPlayer = getPlayer(member.getPlayerName());
                 if (friendPlayer != null) {
                     displayPlayers += member.getPlayerName() + ", ";
@@ -209,15 +197,14 @@ public class CommandOnline extends SocialNetworkCommand<ISocialNetworkSettings> 
     @Override
     public HelpSegment help() {
 
-        ResourcesConfig config = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
 
         HelpSegment helpSegment = new HelpSegment(getCommandType());
 
-        HelpMessage helpMessage = new HelpMessage();
-        helpMessage.setCommand(getCommandType().toString());
-        helpMessage.setDescription(config.getResource("social.online.help"));
-
-        helpSegment.addEntry(helpMessage);
+        HelpMessage mainCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), null, null,
+                        config.getResource("social.online.help"));
+        helpSegment.addEntry(mainCommand);
 
         return helpSegment;
     }

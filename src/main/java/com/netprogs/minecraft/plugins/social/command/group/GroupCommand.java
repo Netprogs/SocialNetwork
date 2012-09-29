@@ -1,9 +1,11 @@
 package com.netprogs.minecraft.plugins.social.command.group;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
+import java.util.Map;
 
 import com.netprogs.minecraft.plugins.social.SocialGroupMember;
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommand;
 import com.netprogs.minecraft.plugins.social.command.exception.ArgumentsMissingException;
@@ -13,13 +15,11 @@ import com.netprogs.minecraft.plugins.social.command.exception.SenderNotInNetwor
 import com.netprogs.minecraft.plugins.social.command.exception.SenderNotPlayerException;
 import com.netprogs.minecraft.plugins.social.command.util.MessageParameter;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.command.util.TimerUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.ISocialNetworkSettings;
 import com.netprogs.minecraft.plugins.social.config.settings.group.GroupSettings;
-import com.netprogs.minecraft.plugins.social.integration.VaultIntegration;
-import com.netprogs.minecraft.plugins.social.storage.SocialNetwork;
+import com.netprogs.minecraft.plugins.social.storage.SocialNetworkStorage;
+import com.netprogs.minecraft.plugins.social.storage.data.Request;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -48,8 +48,6 @@ import org.bukkit.entity.Player;
 
 public abstract class GroupCommand<T extends ISocialNetworkSettings> extends SocialNetworkCommand<T> {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
     protected GroupCommand(ICommandType commandType) {
         super(commandType);
     }
@@ -75,7 +73,7 @@ public abstract class GroupCommand<T extends ISocialNetworkSettings> extends Soc
         Player player = (Player) sender;
 
         // get the social network data
-        SocialNetwork socialConfig = SocialNetwork.getInstance();
+        SocialNetworkStorage socialConfig = SocialNetworkPlugin.getStorage();
 
         // make sure the sender is in the network
         SocialPerson playerPerson = socialConfig.getPerson(player.getName());
@@ -134,12 +132,24 @@ public abstract class GroupCommand<T extends ISocialNetworkSettings> extends Soc
             handleAccept(player, receiverPerson, arguments);
             return true;
 
+        } else if (arguments.get(0).equals("acceptall")) {
+            handleAcceptAll(player, receiverPerson);
+            return true;
+
         } else if (arguments.get(0).equals("reject")) {
             handleReject(player, receiverPerson, arguments, false);
             return true;
 
+        } else if (arguments.get(0).equals("rejectall")) {
+            handleRejectAll(player, receiverPerson, false);
+            return true;
+
         } else if (arguments.get(0).equals("ignore")) {
             handleReject(player, receiverPerson, arguments, true);
+            return true;
+
+        } else if (arguments.get(0).equals("ignoreall")) {
+            handleRejectAll(player, receiverPerson, false);
             return true;
 
         } else if (arguments.get(0).equals("remove")) {
@@ -171,7 +181,7 @@ public abstract class GroupCommand<T extends ISocialNetworkSettings> extends Soc
         }
 
         // get the social network data
-        SocialNetwork socialConfig = SocialNetwork.getInstance();
+        SocialNetworkStorage socialConfig = SocialNetworkPlugin.getStorage();
 
         // if we're here, we want to process a group request
         String personName = arguments.get(1);
@@ -188,14 +198,14 @@ public abstract class GroupCommand<T extends ISocialNetworkSettings> extends Soc
 
             // If I have them on ignore...
             // Check to see if the person they're sending a request to is on their ignore list
-            if (playerPerson.isOnIgnore(groupPerson.getName())) {
+            if (playerPerson.isOnIgnore(groupPerson)) {
                 MessageUtil.sendPlayerIgnoredMessage(player, groupPerson.getName());
                 return false;
             }
 
             // If they have me on ignore...
             // Check to see if the person having a request sent to has the sender on ignore
-            if (groupPerson.isOnIgnore(playerPerson.getName())) {
+            if (groupPerson.isOnIgnore(playerPerson)) {
                 MessageUtil.sendSenderIgnoredMessage(player, groupPerson.getName());
                 return false;
             }
@@ -234,6 +244,9 @@ public abstract class GroupCommand<T extends ISocialNetworkSettings> extends Soc
                     String resource = "social." + getCommandType() + ".request.completed.player";
                     MessageUtil.sendMessage(groupPlayer, resource, ChatColor.GREEN, new MessageParameter("<player>",
                             player.getName(), ChatColor.AQUA));
+
+                    // send the player the command to use to accept the request
+                    displayRequestHelp(groupPlayer);
                 }
 
             } else {
@@ -272,7 +285,7 @@ public abstract class GroupCommand<T extends ISocialNetworkSettings> extends Soc
         }
 
         // get the social network data
-        SocialNetwork socialConfig = SocialNetwork.getInstance();
+        SocialNetworkStorage socialConfig = SocialNetworkPlugin.getStorage();
 
         String personName = arguments.get(1);
 
@@ -329,6 +342,46 @@ public abstract class GroupCommand<T extends ISocialNetworkSettings> extends Soc
     }
 
     /**
+     * Accept a request. Both parties are notified.
+     * @param player
+     * @param receiverPerson
+     * @throws ArgumentsMissingException
+     */
+    protected void handleAcceptAll(Player player, SocialPerson receiverPerson) throws ArgumentsMissingException {
+
+        // get the list of all messages for the player
+        Map<String, List<Request>> requestMessages = receiverPerson.getMessages(Request.class);
+
+        // Grab the requests from each person and check to see if any match this group type
+        // If they do, then process them.
+        boolean requestsAccepted = false;
+        for (String playerName : requestMessages.keySet()) {
+
+            // To call handleAccept, we need to pass it the same parameters it expects
+            // List[0] = command. Sending ours is fine, it's not used.
+            // List[1] = PlayerName. We need to add this.
+            List<String> arguments = new ArrayList<String>();
+            arguments.add("accept");
+            arguments.add(playerName);
+
+            try {
+
+                handleAccept(player, receiverPerson, arguments);
+                requestsAccepted = true;
+
+            } catch (PlayerNotInNetworkException exception) {
+
+                // we want to capture this ourselves, not report it to the player, and not stop processing
+                SocialNetworkPlugin.log("handleAcceptAll PlayerNotInNetworkException: " + exception.getPlayerName());
+            }
+        }
+
+        if (!requestsAccepted) {
+            MessageUtil.sendMessage(player, "social.requests.noneAvailable.sender", ChatColor.RED);
+        }
+    }
+
+    /**
      * Reject a request. Both parties are notified if silent is false. If true, only the sender gets notified.
      * @param player
      * @param playerPerson
@@ -346,7 +399,7 @@ public abstract class GroupCommand<T extends ISocialNetworkSettings> extends Soc
         }
 
         // get the social network data
-        SocialNetwork socialConfig = SocialNetwork.getInstance();
+        SocialNetworkStorage socialConfig = SocialNetworkPlugin.getStorage();
 
         String personName = arguments.get(1);
 
@@ -394,6 +447,48 @@ public abstract class GroupCommand<T extends ISocialNetworkSettings> extends Soc
     }
 
     /**
+     * Reject a request. Both parties are notified if silent is false. If true, only the sender gets notified.
+     * @param player
+     * @param playerPerson
+     * @param silent
+     * @throws ArgumentsMissingException
+     */
+    protected void handleRejectAll(Player player, SocialPerson receiverPerson, boolean silent)
+            throws ArgumentsMissingException {
+
+        // get the list of all messages for the player
+        Map<String, List<Request>> requestMessages = receiverPerson.getMessages(Request.class);
+
+        // Grab the requests from each person and check to see if any match this group type
+        // If they do, then process them.
+        boolean requestsRejected = false;
+        for (String playerName : requestMessages.keySet()) {
+
+            // To call handleReject, we need to pass it the same parameters it expects
+            // List[0] = command. Sending ours is fine, it's not used.
+            // List[1] = PlayerName. We need to add this.
+            List<String> arguments = new ArrayList<String>();
+            arguments.add("reject");
+            arguments.add(playerName);
+
+            try {
+
+                handleReject(player, receiverPerson, arguments, silent);
+                requestsRejected = true;
+
+            } catch (PlayerNotInNetworkException exception) {
+
+                // we want to capture this ourselves, not report it to the player, and not stop processing
+                SocialNetworkPlugin.log("handleRejectAll PlayerNotInNetworkException: " + exception.getPlayerName());
+            }
+        }
+
+        if (!requestsRejected) {
+            MessageUtil.sendMessage(player, "social.requests.noneAvailable.sender", ChatColor.RED);
+        }
+    }
+
+    /**
      * Removes a person from the group list. Also removes you from theirs.
      * @param player
      * @param playerPerson
@@ -410,7 +505,7 @@ public abstract class GroupCommand<T extends ISocialNetworkSettings> extends Soc
         }
 
         // get the social network data
-        SocialNetwork socialConfig = SocialNetwork.getInstance();
+        SocialNetworkStorage socialConfig = SocialNetworkPlugin.getStorage();
 
         String personName = arguments.get(1);
 
@@ -474,7 +569,7 @@ public abstract class GroupCommand<T extends ISocialNetworkSettings> extends Soc
 
         // Some commands will set a timer for their usage. We're going to check for that here based on the command type.
         // If no timer is set by this command, the timeRemaining will be 0.
-        long timeRemaining = TimerUtil.commandOnTimer(playerPerson.getName(), commandType);
+        long timeRemaining = SocialNetworkPlugin.getTimerManager().commandOnTimer(playerPerson.getName(), commandType);
         if (timeRemaining > 0) {
             MessageUtil.sendMessage(player, "social." + commandType + ".cannotSendRequest.ontimer.sender",
                     ChatColor.GOLD, MessageUtil.createCoolDownFormatting(timeRemaining));
@@ -504,7 +599,7 @@ public abstract class GroupCommand<T extends ISocialNetworkSettings> extends Soc
         // check to see if they can afford the cost
         GroupSettings settings = (GroupSettings) getCommandSettings();
         double price = settings.getPerUseCost();
-        boolean authorized = VaultIntegration.getInstance().preAuthCommandPurchase(player, price);
+        boolean authorized = SocialNetworkPlugin.getVault().preAuthCommandPurchase(player, price);
         if (!authorized) {
             return false;
         }
@@ -586,23 +681,19 @@ public abstract class GroupCommand<T extends ISocialNetworkSettings> extends Soc
     /**
      * Displays the group member list as obtained from the sub-class.
      * @param player The player to send response to.
-     * @param memberList The list of people in the group.
+     * @param memberMap The map of people in the group.
      */
-    protected void displayGroupList(Player player, List<? extends SocialGroupMember> memberList) {
+    protected void displayGroupList(Player player, Map<String, ? extends SocialGroupMember> memberMap) {
 
-        String onlineTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.list.tag.online.sender");
-
-        String offlineTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.list.tag.offline.sender");
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
+        String onlineTag = config.getResource("social.list.tag.online.sender");
+        String offlineTag = config.getResource("social.list.tag.offline.sender");
 
         // send the header
         MessageUtil.sendHeaderMessage(player, "social." + getCommandType() + ".list.header.sender");
 
         // check to see if they have anyone
-        if (memberList.size() == 0) {
+        if (memberMap.size() == 0) {
             MessageUtil.sendMessage(player, "social." + getCommandType() + ".list.noPeople.sender", ChatColor.RED);
             return;
         }
@@ -611,7 +702,7 @@ public abstract class GroupCommand<T extends ISocialNetworkSettings> extends Soc
         String offlineList = ChatColor.GRAY + offlineTag + " " + ChatColor.WHITE;
 
         // go through your entire list and display their names and online status
-        for (SocialGroupMember currentPerson : memberList) {
+        for (SocialGroupMember currentPerson : memberMap.values()) {
 
             // check to see if they are online
             Player groupPlayer = getPlayer(currentPerson.getPlayerName());
@@ -631,6 +722,15 @@ public abstract class GroupCommand<T extends ISocialNetworkSettings> extends Soc
 
         player.sendMessage(onlineList);
         player.sendMessage(offlineList);
+    }
+
+    /**
+     * Provides the chance to display a help page to player who have been sent a request.
+     * @param receiver The player to receive the help message.
+     */
+    protected void displayRequestHelp(Player receiver) {
+
+        // This base implementation does not need to do anything during rejection
     }
 
     /**

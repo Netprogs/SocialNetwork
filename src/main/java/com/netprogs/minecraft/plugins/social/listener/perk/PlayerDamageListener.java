@@ -2,18 +2,15 @@ package com.netprogs.minecraft.plugins.social.listener.perk;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.command.util.MessageParameter;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.command.util.TimerUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
-import com.netprogs.minecraft.plugins.social.config.settings.SettingsConfig;
+import com.netprogs.minecraft.plugins.social.command.util.TimerManager;
 import com.netprogs.minecraft.plugins.social.config.settings.perk.PlayerDamageSettings;
 import com.netprogs.minecraft.plugins.social.event.PlayerMemberChangeEvent;
 import com.netprogs.minecraft.plugins.social.event.PlayerMemberChangeEvent.Type;
-import com.netprogs.minecraft.plugins.social.storage.SocialNetwork;
 import com.netprogs.minecraft.plugins.social.storage.data.perk.PersonPlayerDamageSettings;
 
 import org.bukkit.ChatColor;
@@ -48,8 +45,6 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 
 public class PlayerDamageListener extends PerkListener<PlayerDamageSettings, PersonPlayerDamageSettings> {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
     public PlayerDamageListener() {
         super(ListenerType.damage);
     }
@@ -62,8 +57,8 @@ public class PlayerDamageListener extends PerkListener<PlayerDamageSettings, Per
         // if the event is a remove, add a timer for a combination of this perk and the player
         if (event.getEventType() == Type.preRemove) {
 
-            SocialPerson targetPerson = SocialNetwork.getInstance().getPerson(event.getPlayerName());
-            SocialPerson damagerPerson = SocialNetwork.getInstance().getPerson(event.getMemberName());
+            SocialPerson targetPerson = SocialNetworkPlugin.getStorage().getPerson(event.getPlayerName());
+            SocialPerson damagerPerson = SocialNetworkPlugin.getStorage().getPerson(event.getMemberName());
             if (targetPerson != null && damagerPerson != null) {
 
                 // start with a 30 second default. If there are valid settings found, we'll reassign
@@ -76,9 +71,7 @@ public class PlayerDamageListener extends PerkListener<PlayerDamageSettings, Per
                     // we have a valid settings, so grab the cool down from it
                     coolDownPeriod = playerDamageSettings.getCoolDownPeriod();
 
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("PlayerDamage_Timer: Found group, setting timer to: " + coolDownPeriod);
-                    }
+                    SocialNetworkPlugin.log("PlayerDamage_Timer: Found group, setting timer to: " + coolDownPeriod);
 
                 } else if (playerDamageSettings == null && !event.isGroupEmpty()) {
 
@@ -94,21 +87,19 @@ public class PlayerDamageListener extends PerkListener<PlayerDamageSettings, Per
                     // This way we can avoid making a timer entry when one isn't needed.
                     coolDownPeriod = 0;
 
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("PlayerDamage_Timer: No group, but group is empty. Setting timer to 0.");
-                    }
+                    SocialNetworkPlugin.log("PlayerDamage_Timer: No group, but group is empty. Setting timer to 0.");
 
                 } else {
 
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("PlayerDamage_Timer: No group, but group is empty. Setting timer to default: 30");
-                    }
+                    SocialNetworkPlugin
+                            .log("PlayerDamage_Timer: No group, but group is empty. Setting timer to default: 30");
                 }
 
                 // set the timer
                 if (coolDownPeriod != 0) {
                     String timerKey = getListenerType() + "_" + event.getMemberName();
-                    TimerUtil.updateEventTimer(event.getPlayerName(), timerKey, coolDownPeriod);
+                    SocialNetworkPlugin.getTimerManager().updateEventTimer(event.getPlayerName(), timerKey,
+                            coolDownPeriod);
                 }
             }
         }
@@ -125,10 +116,7 @@ public class PlayerDamageListener extends PerkListener<PlayerDamageSettings, Per
         // check early to see what's being damaged
         if (event.getEntityType() != EntityType.PLAYER && !(event.getEntity() instanceof Tameable)) {
 
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("PlayerDamage_Entity: not using target");
-            }
-
+            // SocialNetworkPlugin.log("PlayerDamage_Entity: not using target");
             return;
         }
 
@@ -136,10 +124,7 @@ public class PlayerDamageListener extends PerkListener<PlayerDamageSettings, Per
         if (!(event.getDamager() instanceof Player) && !(event.getDamager() instanceof Projectile)
                 && !(event.getDamager() instanceof Tameable)) {
 
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("PlayerDamage_Entity: not using damager");
-            }
-
+            // SocialNetworkPlugin.log("PlayerDamage_Entity: not using damager");
             return;
         }
 
@@ -169,18 +154,7 @@ public class PlayerDamageListener extends PerkListener<PlayerDamageSettings, Per
 
         // no valid target, give up
         if (target == null) {
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("PlayerDamage_Entity: non-usable target");
-            }
-            return;
-        }
-
-        // Check right away to see if we should be handling this event.
-        // We don't want to be here any longer than we have to.
-        if (!SocialNetwork.getInstance().isSocialNetworkPlayer(target)) {
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("PlayerDamage_Entity: target not in network");
-            }
+            // SocialNetworkPlugin.log("PlayerDamage_Entity: non-usable target");
             return;
         }
 
@@ -221,9 +195,7 @@ public class PlayerDamageListener extends PerkListener<PlayerDamageSettings, Per
 
         // no valid damager, give up
         if (damager == null) {
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("PlayerDamage_Entity: non-usable damager");
-            }
+            // SocialNetworkPlugin.log("PlayerDamage_Entity: non-usable damager");
             return;
         }
 
@@ -231,13 +203,11 @@ public class PlayerDamageListener extends PerkListener<PlayerDamageSettings, Per
 
         // first, lets check to see if this event is still on timer
         String timerKey = getListenerType() + "_" + damager.getName();
-        long timeRemaining = TimerUtil.eventOnTimer(target.getName(), timerKey);
+        long timeRemaining = SocialNetworkPlugin.getTimerManager().eventOnTimer(target.getName(), timerKey);
         if (timeRemaining > 0) {
 
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("PlayerDamage_Timer: " + target.getName() + " on timer for: "
-                        + TimerUtil.formatTime(timeRemaining));
-            }
+            SocialNetworkPlugin.log("PlayerDamage_Timer: " + target.getName() + " on timer for: "
+                    + TimerManager.formatTimeUtc(timeRemaining));
 
             // Send the user a message saying they can't hurt the other person for the timeRemaining
             List<MessageParameter> parameters = new ArrayList<MessageParameter>();
@@ -256,8 +226,8 @@ public class PlayerDamageListener extends PerkListener<PlayerDamageSettings, Per
 
         // Check to make sure they both loaded properly.
         // The above can also return NULL if one or both of them are not in the network.
-        SocialPerson targetPerson = SocialNetwork.getInstance().getPerson(target.getName());
-        SocialPerson damagePerson = SocialNetwork.getInstance().getPerson(damager.getName());
+        SocialPerson targetPerson = SocialNetworkPlugin.getStorage().getPerson(target.getName());
+        SocialPerson damagePerson = SocialNetworkPlugin.getStorage().getPerson(damager.getName());
         if (damagePerson != null && targetPerson != null) {
 
             // Get the settings for this perk.
@@ -265,34 +235,27 @@ public class PlayerDamageListener extends PerkListener<PlayerDamageSettings, Per
 
             // If it returns null, that means the player does not have this peak assigned to any of their current groups
             if (playerDamageSettings == null) {
-                if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                    logger.info("PlayerDamage_SettingsCheck: Players not in a social group containing this perk.");
-                }
+                SocialNetworkPlugin
+                        .log("PlayerDamage_SettingsCheck: Players not in a social group containing this perk.");
                 return;
 
             } else {
 
                 // if they're allowing player damage and it was coming from them, don't continue
                 if (playerDamageSettings.isDamageAllowedFromPlayer() && playerDmg) {
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("PlayerDamage_SettingsCheck: Player Damage allowed");
-                    }
+                    // SocialNetworkPlugin.log("PlayerDamage_SettingsCheck: Player Damage allowed");
                     return;
                 }
 
                 // if they're allowing tameable damage and it was coming from them, don't continue
                 if (playerDamageSettings.isDamageAllowedFromTameable() && tameableDmg) {
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("PlayerDamage_SettingsCheck: Tameable Damage allowed");
-                    }
+                    // SocialNetworkPlugin.log("PlayerDamage_SettingsCheck: Tameable Damage allowed");
                     return;
                 }
 
                 // if they're allowing projectile damage and it was coming from them, don't continue
                 if (playerDamageSettings.isDamageAllowedFromProjectile() && projectileDmg) {
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("PlayerDamage_SettingsCheck: Projectile Damage allowed");
-                    }
+                    // SocialNetworkPlugin.log("PlayerDamage_SettingsCheck: Projectile Damage allowed");
                     return;
                 }
 

@@ -32,6 +32,14 @@ public interface ISocialNetworkDataManager {
 
     public void removePlayer(String playerName);
 
+    public List<String> getExcludedPlayers();
+
+    public boolean isExcludedPlayer(String playerName);
+
+    public void addExcludedPlayer(String playerName);
+
+    public void removeExcludedPlayer(String playerName);
+
     public List<String> getPriests();
 
     public boolean hasPriest(String playerName);

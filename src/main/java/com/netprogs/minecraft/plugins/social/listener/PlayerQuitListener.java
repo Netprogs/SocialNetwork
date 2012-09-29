@@ -1,8 +1,14 @@
 package com.netprogs.minecraft.plugins.social.listener;
 
-import com.netprogs.minecraft.plugins.social.SocialPerson;
-import com.netprogs.minecraft.plugins.social.storage.SocialNetwork;
+import java.util.Map;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
+import com.netprogs.minecraft.plugins.social.SocialPerson;
+import com.netprogs.minecraft.plugins.social.command.util.MessageParameter;
+import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
+
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -37,10 +43,39 @@ public class PlayerQuitListener implements Listener {
         // verify that the sender is actually a player
         if (event.getPlayer() instanceof Player) {
 
-            // check to see if they're part of the network
-            SocialPerson playerPerson = SocialNetwork.getInstance().getPerson(event.getPlayer().getName());
-            if (playerPerson != null) {
+            Player player = event.getPlayer();
 
+            // We want to notify everyone that is in this players groups that they have logged out.
+            // Make sure that the event timer for this has expired. This is used to avoid spamming the chat.
+            long timeRemaining = SocialNetworkPlugin.getTimerManager().eventOnTimer(player.getName(), "LOGIN");
+            if (timeRemaining <= 0) {
+
+                SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(player.getName());
+                if (playerPerson != null) {
+
+                    // Get the list of all unique player among all their groups
+                    // Then for each of those report that this person has logged in
+                    Map<String, SocialPerson> notifyPlayers =
+                            SocialNetworkPlugin.getStorage().getNotificationPlayers(playerPerson);
+
+                    for (String notifyPlayerName : notifyPlayers.keySet()) {
+
+                        // check to see if this person wants to receive login notifications
+                        SocialPerson notifySocialPerson = notifyPlayers.get(notifyPlayerName);
+                        if (!notifySocialPerson.isLoginUpdatesIgnored()) {
+
+                            Player notifyPlayer = Bukkit.getPlayer(notifyPlayerName);
+                            if (notifyPlayer != null) {
+                                MessageUtil.sendMessage(notifyPlayer, "social.group.logout", ChatColor.GREEN,
+                                        new MessageParameter("<player>", playerPerson.getName(), ChatColor.AQUA));
+                            }
+                        }
+                    }
+
+                    // reset their timer for this notification
+                    long cooldown = SocialNetworkPlugin.getSettings().getLoginNotificationCooldown();
+                    SocialNetworkPlugin.getTimerManager().updateEventTimer(player.getName(), "LOGIN", cooldown);
+                }
             }
         }
     }

@@ -2,8 +2,8 @@ package com.netprogs.minecraft.plugins.social.command.group;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.SocialPerson.Status;
 import com.netprogs.minecraft.plugins.social.SocialPerson.WaitState;
@@ -16,17 +16,15 @@ import com.netprogs.minecraft.plugins.social.command.exception.InvalidPermission
 import com.netprogs.minecraft.plugins.social.command.exception.PlayerNotInNetworkException;
 import com.netprogs.minecraft.plugins.social.command.exception.PlayerNotOnlineException;
 import com.netprogs.minecraft.plugins.social.command.exception.SenderNotPlayerException;
+import com.netprogs.minecraft.plugins.social.command.help.HelpBook;
 import com.netprogs.minecraft.plugins.social.command.help.HelpMessage;
 import com.netprogs.minecraft.plugins.social.command.help.HelpSegment;
 import com.netprogs.minecraft.plugins.social.command.util.MessageParameter;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.command.util.TimerUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.SettingsConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.group.PriestSettings;
-import com.netprogs.minecraft.plugins.social.integration.VaultIntegration;
-import com.netprogs.minecraft.plugins.social.storage.SocialNetwork;
+import com.netprogs.minecraft.plugins.social.storage.SocialNetworkStorage;
 import com.netprogs.minecraft.plugins.social.storage.data.Wedding;
 
 import org.bukkit.Bukkit;
@@ -56,8 +54,6 @@ import org.bukkit.entity.Player;
 
 public class CommandPriest extends SocialNetworkCommand<PriestSettings> implements IWaitCommand {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
     public CommandPriest() {
         super(SocialNetworkCommandType.priest);
     }
@@ -78,7 +74,7 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
 
             // since we have a player, if the command wasn't handled, let's check to make sure they're a priest
             if (!commandHandled) {
-                SocialPerson playerPerson = SocialNetwork.getInstance().getPerson(player.getName());
+                SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(player.getName());
                 if (playerPerson != null && !playerPerson.isPriest()) {
 
                     // If they didn't have priest assigned to them, check the permissions to see if they have it there
@@ -97,19 +93,35 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
                 throw new ArgumentsMissingException();
             }
 
+            // check to see if we have a player, if they are, check to make sure they're a lawyer
+            if (sender instanceof Player) {
+
+                Player player = (Player) sender;
+                SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(player.getName());
+
+                // since we have a player, let's check to make sure they're a lawyer
+                if (playerPerson != null && !playerPerson.isPriest()) {
+
+                    // If they didn't have priest assigned to them, check the permissions to see if they have it there
+                    if (!hasCommandPermission(sender)) {
+                        throw new InvalidPermissionsException();
+                    }
+                }
+            }
+
             // get the social network data
             PriestSettings settings = getCommandSettings();
 
             // make sure the A player is in the network
             String aPlayerName = arguments.get(0);
-            SocialPerson aPlayerPerson = SocialNetwork.getInstance().getPerson(aPlayerName);
+            SocialPerson aPlayerPerson = SocialNetworkPlugin.getStorage().getPerson(aPlayerName);
             if (aPlayerPerson == null) {
                 throw new PlayerNotInNetworkException(aPlayerName);
             }
 
             // make sure the B player is in the network
             String bPlayerName = arguments.get(1);
-            SocialPerson bPlayerPerson = SocialNetwork.getInstance().getPerson(bPlayerName);
+            SocialPerson bPlayerPerson = SocialNetworkPlugin.getStorage().getPerson(bPlayerName);
             if (bPlayerPerson == null) {
                 throw new PlayerNotInNetworkException(bPlayerName);
             }
@@ -122,8 +134,8 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
                 // check to see if the couple can afford this request
                 double price = settings.getPerUseCost();
                 boolean authorized = true;
-                authorized &= VaultIntegration.getInstance().preAuthCommandPurchase(aPlayer, price);
-                authorized &= VaultIntegration.getInstance().preAuthCommandPurchase(bPlayer, price);
+                authorized &= SocialNetworkPlugin.getVault().preAuthCommandPurchase(aPlayer, price);
+                authorized &= SocialNetworkPlugin.getVault().preAuthCommandPurchase(bPlayer, price);
                 if (!authorized) {
                     MessageUtil.sendMessage(sender, "social.priest.request.coupleCannotAfford.sender", ChatColor.GOLD);
                     return false;
@@ -132,7 +144,9 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
                 // Divorced couples remain on a "bitterness" phase for a period of time.
                 // During this time they're not allowed to get married again. Check for that now.
                 long timeRemaining =
-                        TimerUtil.commandOnTimer(aPlayerPerson.getName(), SocialNetworkCommandType.divorce);
+                        SocialNetworkPlugin.getTimerManager().commandOnTimer(aPlayerPerson.getName(),
+                                SocialNetworkCommandType.divorce);
+
                 if (timeRemaining > 0) {
 
                     // tell the user how much time remains
@@ -147,7 +161,10 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
 
                 // Engaged couples remain on an engagement phase for a period of time.
                 // During this time they're not allowed to get married. Check for that now.
-                timeRemaining = TimerUtil.commandOnTimer(aPlayerPerson.getName(), SocialNetworkCommandType.engagement);
+                timeRemaining =
+                        SocialNetworkPlugin.getTimerManager().commandOnTimer(aPlayerPerson.getName(),
+                                SocialNetworkCommandType.engagement);
+
                 if (timeRemaining > 0) {
 
                     // tell the user how much time remains
@@ -160,7 +177,7 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
                 }
 
                 // Check to see if they allow same gender Marriage
-                if (!PluginConfig.getInstance().getConfig(SettingsConfig.class).isSameGenderMarriageAllowed()) {
+                if (!SocialNetworkPlugin.getSettings().isSameGenderMarriageAllowed()) {
                     if (aPlayerPerson.getGender() == bPlayerPerson.getGender()) {
                         MessageUtil.sendMessage(sender, "social.error.sameGenderDisabled.sender", ChatColor.RED);
                         return false;
@@ -182,7 +199,9 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
                     return false;
                 }
 
+                //
                 // Okay, we have everyone now. Let's send them each a message and force them to answer
+                //
 
                 // make it so we won't accept any commands other than our accept/reject
                 Wedding aPlayerWaitData =
@@ -199,8 +218,8 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
                 sendPlayerRequestMessage(sender, bPlayer);
 
                 // save the changes to disk
-                SocialNetwork.getInstance().savePerson(aPlayerPerson);
-                SocialNetwork.getInstance().savePerson(bPlayerPerson);
+                SocialNetworkPlugin.getStorage().savePerson(aPlayerPerson);
+                SocialNetworkPlugin.getStorage().savePerson(bPlayerPerson);
 
             } else {
 
@@ -229,16 +248,20 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
         messageVariables.add(priestParam);
         messageVariables.add(playerParam);
 
+        // send accept/reject message to the player
         MessageUtil.sendMessage(player, "social.priest.request.question.player", ChatColor.GREEN, messageVariables);
         MessageUtil.sendMessage(player, "social.priest.request.commands.player", ChatColor.GREEN);
+
+        // send a message to priest saying the player was contacted
+        MessageUtil.sendMessage(sender, "social.priest.request.waiting.sender", ChatColor.GREEN, messageVariables);
     }
 
     private boolean handleSecondaryCommands(Player player, List<String> arguments) throws ArgumentsMissingException,
             PlayerNotInNetworkException {
 
         // get the social network data
-        SocialNetwork socialConfig = SocialNetwork.getInstance();
-        SettingsConfig settingsConfig = PluginConfig.getInstance().getConfig(SettingsConfig.class);
+        SocialNetworkStorage socialConfig = SocialNetworkPlugin.getStorage();
+        SettingsConfig settingsConfig = SocialNetworkPlugin.getSettings();
 
         // need to make sure we have at least one argument (the command parameter)
         if (arguments.size() == 1) {
@@ -249,12 +272,10 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
              * Don't save the changes until we hear from the second one?
              */
 
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("Processing player marriage acceptance.");
-            }
+            SocialNetworkPlugin.log("Processing player marriage acceptance.");
 
             // we only want to run this if the player is in the network
-            SocialPerson playerPerson = SocialNetwork.getInstance().getPerson(player.getName());
+            SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(player.getName());
             if (playerPerson != null) {
 
                 if (arguments.get(0).equals("list")) {
@@ -263,20 +284,16 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
                     MessageUtil.sendHeaderMessage(player, "social.admin.priest.list.header.sender");
 
                     // check to see if they have anyone
-                    List<String> priestPlayers = SocialNetwork.getInstance().getPriests();
+                    List<String> priestPlayers = SocialNetworkPlugin.getStorage().getPriests();
                     if (priestPlayers.size() == 0) {
 
                         MessageUtil.sendMessage(player, "social.priest.list.noPeople.sender", ChatColor.GREEN);
 
                     } else {
 
-                        String onlineTag =
-                                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                                        .getResource("social.list.tag.online.sender");
-
-                        String offlineTag =
-                                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                                        .getResource("social.list.tag.offline.sender");
+                        ResourcesConfig config = SocialNetworkPlugin.getResources();
+                        String onlineTag = config.getResource("social.list.tag.online.sender");
+                        String offlineTag = config.getResource("social.list.tag.offline.sender");
 
                         String onlineList = ChatColor.GREEN + onlineTag + " " + ChatColor.WHITE;
                         String offlineList = ChatColor.GRAY + offlineTag + " " + ChatColor.WHITE;
@@ -314,9 +331,7 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
                         return true;
                     }
 
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("Processing " + playerPerson.getName() + " accept.");
-                    }
+                    SocialNetworkPlugin.log("Processing " + playerPerson.getName() + " accept.");
 
                     // Check to see if the other person has rejected their vows
                     // If it's NULL, we got here first and we'll assume it's okay to add them
@@ -334,12 +349,10 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
                     if (spousePerson.getWeddingVows() == null || spousePerson.getWeddingVows() == WeddingVows.accepted) {
 
                         // Player got here first. Create the marriage
-                        if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                            if (spousePerson.getWeddingVows() == WeddingVows.accepted) {
-                                logger.info("Spouse " + spousePerson.getName() + " has already accepted.");
-                            } else {
-                                logger.info("Player " + spousePerson.getName() + " has accepted.");
-                            }
+                        if (spousePerson.getWeddingVows() == WeddingVows.accepted) {
+                            SocialNetworkPlugin.log("Spouse " + spousePerson.getName() + " has already accepted.");
+                        } else {
+                            SocialNetworkPlugin.log("Player " + spousePerson.getName() + " has accepted.");
                         }
 
                         // get the priest first
@@ -347,7 +360,7 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
                         Player priestPlayer = getPlayer(wedding.getPriest());
 
                         // We got here first, so create the marriage
-                        playerPerson.createMarriage(spousePerson.getName());
+                        playerPerson.createMarriage(spousePerson);
 
                         // remove their engagement
                         playerPerson.breakEngagement();
@@ -391,14 +404,16 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
 
                             // update the timer for the marriage
                             int timer = settings.getHoneymoonPeriod();
-                            TimerUtil.updateCommandTimer(playerPerson.getName(), SocialNetworkCommandType.marriage,
-                                    timer);
-                            TimerUtil.updateCommandTimer(spousePerson.getName(), SocialNetworkCommandType.marriage,
-                                    timer);
+
+                            SocialNetworkPlugin.getTimerManager().updateCommandTimer(playerPerson.getName(),
+                                    SocialNetworkCommandType.marriage, timer);
+
+                            SocialNetworkPlugin.getTimerManager().updateCommandTimer(spousePerson.getName(),
+                                    SocialNetworkCommandType.marriage, timer);
 
                             // now charge for our services
-                            VaultIntegration.getInstance().processCommandPurchase(player, settings.getPerUseCost());
-                            VaultIntegration.getInstance().processCommandPurchase(spousePlayer,
+                            SocialNetworkPlugin.getVault().processCommandPurchase(player, settings.getPerUseCost());
+                            SocialNetworkPlugin.getVault().processCommandPurchase(spousePlayer,
                                     settings.getPerUseCost());
 
                             MessageParameter priestParam =
@@ -437,9 +452,8 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
                     } else if (spousePerson.getWeddingVows() == WeddingVows.rejected) {
 
                         // If the spouse rejected the player, change the player settings
-                        if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                            logger.info("Spouse " + spousePerson.getName() + " has already rejected. Doing cleanup.");
-                        }
+                        SocialNetworkPlugin.log("Spouse " + spousePerson.getName()
+                                + " has already rejected. Doing cleanup.");
                     }
 
                     return true;
@@ -452,9 +466,7 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
                         return true;
                     }
 
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("Processing " + playerPerson.getName() + " reject.");
-                    }
+                    SocialNetworkPlugin.log("Processing " + playerPerson.getName() + " reject.");
 
                     // Check to see if the other person was there first and if they accepted.
                     // If they accepted, do cleanup
@@ -471,20 +483,17 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
                     if (spousePerson.getWeddingVows() == null || spousePerson.getWeddingVows() == WeddingVows.rejected) {
 
                         // Player got here first
-                        if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                            if (spousePerson.getWeddingVows() == WeddingVows.rejected) {
-                                logger.info("Spouse " + spousePerson.getName() + " has already rejected.");
-                            } else {
-                                logger.info("Player " + playerPerson.getName() + " has rejected.");
-                            }
+                        if (spousePerson.getWeddingVows() == WeddingVows.rejected) {
+                            SocialNetworkPlugin.log("Spouse " + spousePerson.getName() + " has already rejected.");
+                        } else {
+                            SocialNetworkPlugin.log("Player " + playerPerson.getName() + " has rejected.");
                         }
 
                     } else if (spousePerson.getWeddingVows() == WeddingVows.accepted) {
 
                         // Spouse accepted theirs first.
-                        if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                            logger.info("Spouse " + spousePerson.getName() + " has already accepted. Doing cleanup.");
-                        }
+                        SocialNetworkPlugin.log("Spouse " + spousePerson.getName()
+                                + " has already accepted. Doing cleanup.");
                     }
 
                     // get the priest first
@@ -568,10 +577,13 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
     public void displayWaitHelp(CommandSender sender) {
 
         // lookup the person's information in the network
-        SocialPerson playerPerson = SocialNetwork.getInstance().getPerson(sender.getName());
+        SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(sender.getName());
         if (playerPerson != null) {
 
             Wedding wedding = playerPerson.getWaitData();
+
+            // send the error message saying we're still waiting
+            MessageUtil.sendMessage(sender, "social.wait.waitingForResponse.sender", ChatColor.RED);
 
             // now tell the user they need to use the /join <male/female> command
             MessageParameter priestParam = new MessageParameter("<priest>", wedding.getPriest(), ChatColor.AQUA);
@@ -590,30 +602,26 @@ public class CommandPriest extends SocialNetworkCommand<PriestSettings> implemen
     public HelpSegment help() {
 
         HelpSegment helpSegment = new HelpSegment(getCommandType());
-        ResourcesConfig config = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
 
-        HelpMessage mainCommand = new HelpMessage();
-        mainCommand.setCommand(getCommandType().toString());
-        mainCommand.setArguments("<playerA> <playerB>");
-        mainCommand.setDescription(config.getResource("social.priest.help.request"));
+        HelpMessage mainCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "request", "<playerA> <playerB>",
+                        config.getResource("social.priest.help.request"));
         helpSegment.addEntry(mainCommand);
 
-        HelpMessage listCommand = new HelpMessage();
-        listCommand.setCommand(getCommandType().toString());
-        listCommand.setArguments("list");
-        listCommand.setDescription(config.getResource("social.priest.help.list"));
+        HelpMessage listCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "list", null,
+                        config.getResource("social.priest.help.list"));
         helpSegment.addEntry(listCommand);
 
-        HelpMessage acceptCommand = new HelpMessage();
-        acceptCommand.setCommand(getCommandType().toString());
-        acceptCommand.setArguments("accept");
-        acceptCommand.setDescription(config.getResource("social.priest.help.accept"));
+        HelpMessage acceptCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "accept", null,
+                        config.getResource("social.priest.help.accept"));
         helpSegment.addEntry(acceptCommand);
 
-        HelpMessage rejectCommand = new HelpMessage();
-        rejectCommand.setCommand(getCommandType().toString());
-        rejectCommand.setArguments("reject");
-        rejectCommand.setDescription(config.getResource("social.priest.help.reject"));
+        HelpMessage rejectCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "reject", null,
+                        config.getResource("social.priest.help.reject"));
         helpSegment.addEntry(rejectCommand);
 
         return helpSegment;

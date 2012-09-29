@@ -1,15 +1,10 @@
 package com.netprogs.minecraft.plugins.social.listener.perk;
 
-import java.util.logging.Logger;
-
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
-import com.netprogs.minecraft.plugins.social.config.settings.SettingsConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.perk.LWCSettings;
 import com.netprogs.minecraft.plugins.social.event.PlayerMemberChangeEvent;
 import com.netprogs.minecraft.plugins.social.event.PlayerMemberChangeEvent.Type;
-import com.netprogs.minecraft.plugins.social.integration.LWCIntegration;
-import com.netprogs.minecraft.plugins.social.storage.SocialNetwork;
 import com.netprogs.minecraft.plugins.social.storage.data.perk.IPersonPerkSettings;
 
 import org.bukkit.event.EventHandler;
@@ -37,8 +32,6 @@ import org.bukkit.event.EventPriority;
 
 public class LWCListener extends PerkListener<LWCSettings, IPersonPerkSettings> {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
     public LWCListener() {
         super(ListenerType.lwc);
     }
@@ -47,8 +40,8 @@ public class LWCListener extends PerkListener<LWCSettings, IPersonPerkSettings> 
     public void onPlayerMemberChangeEvent(PlayerMemberChangeEvent event) {
 
         // Something changed with your group members. Let's check to see if anyone left.
-        SocialPerson playerPerson = SocialNetwork.getInstance().getPerson(event.getPlayerName());
-        SocialPerson memberPerson = SocialNetwork.getInstance().getPerson(event.getMemberName());
+        SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(event.getPlayerName());
+        SocialPerson memberPerson = SocialNetworkPlugin.getStorage().getPerson(event.getMemberName());
         if (playerPerson != null && memberPerson != null) {
 
             if (event.getEventType() == Type.postAdd) {
@@ -57,13 +50,11 @@ public class LWCListener extends PerkListener<LWCSettings, IPersonPerkSettings> 
                 LWCSettings lwcSettings = getPerkSettings(playerPerson, memberPerson);
                 if (lwcSettings != null) {
 
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("LWC: " + playerPerson.getName() + " is adding " + memberPerson.getName()
-                                + " as Member.");
-                    }
+                    SocialNetworkPlugin.log("LWC: " + playerPerson.getName() + " is adding " + memberPerson.getName()
+                            + " as Member.");
 
                     // add them to the players lwc
-                    LWCIntegration.getInstance().addPermission(playerPerson.getName(), memberPerson.getName());
+                    SocialNetworkPlugin.getLwc().addPermission(playerPerson.getName(), memberPerson.getName());
                 }
 
             } else if (event.getEventType() == Type.postRemove) {
@@ -73,13 +64,11 @@ public class LWCListener extends PerkListener<LWCSettings, IPersonPerkSettings> 
                 LWCSettings lwcSettings = getPerkSettings(playerPerson, memberPerson);
                 if (lwcSettings == null) {
 
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("LWC: " + playerPerson.getName() + " is removing " + memberPerson.getName()
-                                + " as Member.");
-                    }
+                    SocialNetworkPlugin.log("LWC: " + playerPerson.getName() + " is removing " + memberPerson.getName()
+                            + " as Member.");
 
                     // add them to the players lwc as a member
-                    LWCIntegration.getInstance().removePermission(playerPerson.getName(), memberPerson.getName());
+                    SocialNetworkPlugin.getLwc().removePermission(playerPerson.getName(), memberPerson.getName());
                 }
             }
         }

@@ -10,13 +10,10 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Logger;
 
 import com.netprogs.minecraft.plugins.social.command.ISocialNetworkCommand.ICommandType;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
-import com.netprogs.minecraft.plugins.social.config.settings.SettingsConfig;
+
+import org.bukkit.plugin.Plugin;
 
 /*
- * "Social Network" is a Craftbukkit Minecraft server modification plug-in. It attempts to add a 
- * social environment to your server by allowing players to be placed into different types of social groups.
- * 
  * Copyright (C) 2012 Scott Milne
  * 
  * This program is free software: you can redistribute it and/or modify
@@ -34,27 +31,33 @@ import com.netprogs.minecraft.plugins.social.config.settings.SettingsConfig;
  */
 
 /**
- * All timers are lost after a server restart. I don't really see the advantage of persisting these.
- * However, I'm not against the idea should people want it.
+ * This utility class keeps track of timers for commands and events.
+ * The information stored here is not persisted, so when the server is restarted, the timers are cleared.
  */
-public class TimerUtil {
+public class TimerManager {
 
-    private static final Logger logger = Logger.getLogger("Minecraft");
+    private Logger logger;
+    private boolean isLoggingDebug;
 
     // Map<PlayerName, Map<CommandType, TimeInSeconds>>
-    private static final Map<String, Map<ICommandType, Long>> commandTimers =
-            new HashMap<String, Map<ICommandType, Long>>();
+    private final Map<String, Map<ICommandType, Long>> commandTimers = new HashMap<String, Map<ICommandType, Long>>();
 
     // Map<PlayerName, Map<StringEventName, TimeInSeconds>>
-    private static final Map<String, Map<String, Long>> eventTimers = new HashMap<String, Map<String, Long>>();
+    private final Map<String, Map<String, Long>> eventTimers = new HashMap<String, Map<String, Long>>();
 
-    private final static ReentrantReadWriteLock rwCommandLock = new ReentrantReadWriteLock(true);
-    private final static ReentrantReadWriteLock rwEventLock = new ReentrantReadWriteLock(true);
+    private final ReentrantReadWriteLock rwCommandLock = new ReentrantReadWriteLock(true);
+    private final ReentrantReadWriteLock rwEventLock = new ReentrantReadWriteLock(true);
+
+    public TimerManager(Plugin plugin, boolean isLoggingDebug) {
+
+        logger = plugin.getLogger();
+        this.isLoggingDebug = isLoggingDebug;
+    }
 
     /**
      * Cleans up old timers to let them get GC and reduce memory stamp.
      */
-    private static void cleanCommandTimers() {
+    private void cleanCommandTimers() {
 
         for (Iterator<String> it = commandTimers.keySet().iterator(); it.hasNext();) {
 
@@ -68,7 +71,7 @@ public class TimerUtil {
                 long lastCommandTime = playerMap.get(commandType);
 
                 if (lastCommandTime <= System.currentTimeMillis()) {
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
+                    if (isLoggingDebug) {
                         logger.info("Removing expired command timer: [" + playerName + ", " + commandType + "]");
                     }
                     playerMapIterator.remove();
@@ -80,7 +83,7 @@ public class TimerUtil {
     /**
      * Cleans up old timers to let them get GC and reduce memory stamp.
      */
-    private static void cleanEventTimers() {
+    private void cleanEventTimers() {
 
         for (Iterator<String> it = eventTimers.keySet().iterator(); it.hasNext();) {
 
@@ -94,7 +97,9 @@ public class TimerUtil {
                 long lastCommandTime = playerMap.get(eventType);
 
                 if (lastCommandTime <= System.currentTimeMillis()) {
-                    logger.info("Removing expired event timer: [" + playerName + ", " + eventType + "]");
+                    if (isLoggingDebug) {
+                        logger.info("Removing expired event timer: [" + playerName + ", " + eventType + "]");
+                    }
                     playerMapIterator.remove();
                 }
             }
@@ -107,7 +112,7 @@ public class TimerUtil {
      * @param socialCommand The command being run.
      * @return Amount of time remaining. If 0, means it's not on timer.
      */
-    public static long commandOnTimer(String playerName, ICommandType commandType) {
+    public long commandOnTimer(String playerName, ICommandType commandType) {
 
         Lock lock = rwCommandLock.readLock();
         lock.lock();
@@ -119,9 +124,9 @@ public class TimerUtil {
 
                 long lastCommandTime = timerInfo.get(commandType);
 
-                if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                    logger.info("commandOnTimer, lastCommandTime: " + formatTime(lastCommandTime) + " > "
-                            + formatTime(System.currentTimeMillis()));
+                if (isLoggingDebug) {
+                    logger.info("commandOnTimer, lastCommandTime: " + formatTimeUtc(lastCommandTime) + " > "
+                            + formatTimeUtc(System.currentTimeMillis()));
                 }
 
                 // check to see if they're allowed to use the command
@@ -129,9 +134,8 @@ public class TimerUtil {
 
                     long remaining = (lastCommandTime - System.currentTimeMillis());
 
-                    // String timeRemaining = formatTime(remaining);
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("commandOnTimer, timeRemaining: " + formatTime(remaining));
+                    if (isLoggingDebug) {
+                        logger.info("commandOnTimer, timeRemaining: " + formatTimeUtc(remaining));
                     }
 
                     // It's on timer, return the time
@@ -152,7 +156,7 @@ public class TimerUtil {
      * @param commandType The command type.
      * @param timer The new timer period to assign (in seconds).
      */
-    public static void updateCommandTimer(String playerName, ICommandType commandType, long timer) {
+    public void updateCommandTimer(String playerName, ICommandType commandType, long timer) {
 
         Lock lock = rwCommandLock.writeLock();
         lock.lock();
@@ -161,7 +165,7 @@ public class TimerUtil {
             // clean out old timers
             cleanCommandTimers();
 
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
+            if (isLoggingDebug) {
                 logger.info("updateCommandTimer: " + commandType + " " + timer);
             }
 
@@ -173,14 +177,14 @@ public class TimerUtil {
                 timerInfo = new HashMap<ICommandType, Long>();
                 commandTimers.put(playerName, timerInfo);
 
-                if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
+                if (isLoggingDebug) {
                     logger.info("Created new timer entry for: " + commandType);
                 }
             }
 
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
+            if (isLoggingDebug) {
                 logger.info("Updating timer for command: " + commandType + " to: "
-                        + formatTime(System.currentTimeMillis() + (timer * 1000)));
+                        + formatTimeUtc(System.currentTimeMillis() + (timer * 1000)));
             }
 
             // now update the cooldown
@@ -192,12 +196,12 @@ public class TimerUtil {
     }
 
     /**
-     * Determines if the provided command is on timer for the user.
-     * @param player The name of the player running the command.
-     * @param socialCommand The command being run.
+     * Determines if the provided event is on timer for the user.
+     * @param player The name of the player.
+     * @param eventType The event being run.
      * @return Amount of time remaining. If 0, means it's not on timer.
      */
-    public static long eventOnTimer(String playerName, String eventType) {
+    public long eventOnTimer(String playerName, String eventType) {
 
         Lock lock = rwEventLock.readLock();
         lock.lock();
@@ -207,21 +211,20 @@ public class TimerUtil {
             Map<String, Long> timerInfo = eventTimers.get(playerName);
             if (timerInfo != null && timerInfo.containsKey(eventType)) {
 
-                long lastCommandTime = timerInfo.get(eventType);
+                long lastEventTime = timerInfo.get(eventType);
 
-                if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                    logger.info("eventOnTimer, lastCommandTime: " + formatTime(lastCommandTime) + " > "
-                            + formatTime(System.currentTimeMillis()));
+                if (isLoggingDebug) {
+                    logger.info("eventOnTimer, lastEventTime: " + formatTimeUtc(lastEventTime) + " > "
+                            + formatTimeUtc(System.currentTimeMillis()));
                 }
 
-                // check to see if they're allowed to use the command
-                if (lastCommandTime > System.currentTimeMillis()) {
+                // check to see if the event is allowed to happen
+                if (lastEventTime > System.currentTimeMillis()) {
 
-                    long remaining = (lastCommandTime - System.currentTimeMillis());
+                    long remaining = (lastEventTime - System.currentTimeMillis());
 
-                    // String timeRemaining = formatTime(remaining);
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("eventOnTimer, timeRemaining: " + formatTime(remaining));
+                    if (isLoggingDebug) {
+                        logger.info("eventOnTimer, timeRemaining: " + formatTimeUtc(remaining));
                     }
 
                     // It's on timer, return the time
@@ -239,18 +242,19 @@ public class TimerUtil {
     /**
      * Updates the command timer for the player.
      * @param playerName The name of the player running the command.
-     * @param commandType The command type.
+     * @param eventType The event name.
      * @param timer The new timer period to assign (in seconds).
      */
-    public static void updateEventTimer(String playerName, String eventType, long timer) {
+    public void updateEventTimer(String playerName, String eventType, long timer) {
 
         Lock lock = rwEventLock.writeLock();
         lock.lock();
         try {
+
             // clean out old timers
             cleanEventTimers();
 
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
+            if (isLoggingDebug) {
                 logger.info("updateEventTimer: " + eventType + " " + timer);
             }
 
@@ -262,14 +266,14 @@ public class TimerUtil {
                 timerInfo = new HashMap<String, Long>();
                 eventTimers.put(playerName, timerInfo);
 
-                if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
+                if (isLoggingDebug) {
                     logger.info("Created new timer entry for: " + eventType);
                 }
             }
 
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("Updating timer for command: " + eventType + " to: "
-                        + formatTime(System.currentTimeMillis() + (timer * 1000)));
+            if (isLoggingDebug) {
+                logger.info("Updating timer for event: " + eventType + " to: "
+                        + formatTimeUtc(System.currentTimeMillis() + (timer * 1000)));
             }
 
             // now update the cooldown
@@ -280,21 +284,62 @@ public class TimerUtil {
         }
     }
 
-    public static String formatTime(long time) {
+    public void removeTimers(String playerName) {
+
+        commandTimers.remove(playerName);
+        eventTimers.remove(playerName);
+    }
+
+    public static String formatTime(long time, boolean utcFormat, boolean longDescription) {
 
         SimpleDateFormat hourFormat = new SimpleDateFormat("HH");
-        hourFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
-
         SimpleDateFormat minFormat = new SimpleDateFormat("mm");
-        minFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
-
         SimpleDateFormat secFormat = new SimpleDateFormat("ss");
-        secFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
 
-        String timeRemaining = hourFormat.format(time) + " hours, ";
-        timeRemaining += minFormat.format(time) + " minutes, ";
-        timeRemaining += secFormat.format(time) + " seconds";
+        if (utcFormat) {
 
-        return timeRemaining;
+            hourFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+            minFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+            secFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+        }
+
+        if (longDescription) {
+
+            String timeRemaining = hourFormat.format(time) + " hours, ";
+            timeRemaining += minFormat.format(time) + " minutes, ";
+            timeRemaining += secFormat.format(time) + " seconds";
+            return timeRemaining;
+
+        } else {
+
+            String hours = hourFormat.format(time);
+            String minutes = minFormat.format(time);
+            String seconds = secFormat.format(time);
+
+            String timeRemaining = hours + ":" + minutes + ":" + seconds;
+            return timeRemaining;
+        }
+    }
+
+    public static String formatDate(long time) {
+
+        SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, d MMM yyyy h:mm a");
+        return dateFormat.format(time);
+    }
+
+    public static String formatTime(long time) {
+        return formatTime(time, false, false);
+    }
+
+    public static String formatTime(long time, boolean longDescription) {
+        return formatTime(time, false, longDescription);
+    }
+
+    public static String formatTimeUtc(long time) {
+        return formatTime(time, true, false);
+    }
+
+    public static String formatTimeUtc(long time, boolean longDescription) {
+        return formatTime(time, true, longDescription);
     }
 }

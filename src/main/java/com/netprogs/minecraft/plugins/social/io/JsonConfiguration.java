@@ -1,4 +1,4 @@
-package com.netprogs.minecraft.plugins.social.config;
+package com.netprogs.minecraft.plugins.social.io;
 
 /*
  * "Social Network" is a Craftbukkit Minecraft server modification plug-in. It attempts to add a 
@@ -27,8 +27,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import org.bukkit.craftbukkit.libs.com.google.gson.Gson;
+import org.bukkit.craftbukkit.libs.com.google.gson.GsonBuilder;
 
 public abstract class JsonConfiguration<T> extends Configuration<T> {
 

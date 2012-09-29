@@ -24,15 +24,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import com.google.gson.GsonBuilder;
-import com.netprogs.minecraft.plugins.social.config.JsonConfiguration;
-import com.netprogs.minecraft.plugins.social.config.JsonInterfaceAdapter;
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.config.settings.group.AffairSettings;
 import com.netprogs.minecraft.plugins.social.config.settings.group.ChildSettings;
 import com.netprogs.minecraft.plugins.social.config.settings.group.DivorceSettings;
@@ -44,10 +42,12 @@ import com.netprogs.minecraft.plugins.social.config.settings.group.MarriageSetti
 import com.netprogs.minecraft.plugins.social.config.settings.group.PriestSettings;
 import com.netprogs.minecraft.plugins.social.config.settings.group.RelationshipSettings;
 import com.netprogs.minecraft.plugins.social.config.settings.perk.IPerkSettings;
+import com.netprogs.minecraft.plugins.social.io.JsonConfiguration;
+import com.netprogs.minecraft.plugins.social.io.JsonInterfaceAdapter;
+
+import org.bukkit.craftbukkit.libs.com.google.gson.GsonBuilder;
 
 public class SettingsConfig extends JsonConfiguration<Settings> {
-
-    private final Logger logger = Logger.getLogger("Minecraft");
 
     // The social settings are the settings for the social network. All types end up here.
     private final Map<Class<? extends ISocialNetworkSettings>, ISocialNetworkSettings> settingsMap =
@@ -81,6 +81,10 @@ public class SettingsConfig extends JsonConfiguration<Settings> {
         generateSocialMaps();
     }
 
+    public boolean isAutoJoinOnLogin() {
+        return getDataObject().isAutoJoinOnLogin();
+    }
+
     public boolean isLoggingDebug() {
         return getDataObject().isLoggingDebug();
     }
@@ -93,12 +97,36 @@ public class SettingsConfig extends JsonConfiguration<Settings> {
         return getDataObject().isGenderChoiceRequired();
     }
 
+    public boolean isGenderChoiceFreezeEnabled() {
+        return getDataObject().isGenderChoiceFreezeEnabled();
+    }
+
+    public boolean isGenderChoiceReminderEnabled() {
+        return getDataObject().isGenderChoiceReminderEnabled();
+    }
+
     public boolean isGlobalAnnouncePriestMarriages() {
         return getDataObject().isGlobalAnnouncePriestMarriages();
     }
 
-    public GroupSettings[] getSocialNetworkGroupSettings() {
-        return settings.toArray(new GroupSettings[settings.size()]);
+    public boolean isMultiWorldGiftsAllowed() {
+        return getDataObject().isMultiWorldGiftsAllowed();
+    }
+
+    public long getStatusMessageNotificationCooldown() {
+        return getDataObject().getStatusMessageNotificationCooldown();
+    }
+
+    public long getLoginNotificationCooldown() {
+        return getDataObject().getLoginNotificationCooldown();
+    }
+
+    public CommandMapSettings getCommandMapSettings() {
+        return getDataObject().getCommandMapSettings();
+    }
+
+    public Iterator<GroupSettings> getSocialNetworkGroupSettings() {
+        return settings.iterator();
     }
 
     public <T extends ISocialNetworkSettings> T getSocialNetworkSettings(Class<T> settingsClass) {
@@ -126,7 +154,7 @@ public class SettingsConfig extends JsonConfiguration<Settings> {
             // settingsMap.put(AffairSettings.class, affairSettings);
             settings.add(affairSettings);
         } else {
-            logger.log(Level.SEVERE, "AffairSettings is invalid");
+            SocialNetworkPlugin.logger().log(Level.SEVERE, "AffairSettings is invalid");
         }
 
         ChildSettings childSettings = getDataObject().getSocialGroupSettings().getChildSettings();
@@ -134,7 +162,7 @@ public class SettingsConfig extends JsonConfiguration<Settings> {
             // settingsMap.put(ChildSettings.class, childSettings);
             settings.add(childSettings);
         } else {
-            logger.log(Level.SEVERE, "ChildSettings is invalid");
+            SocialNetworkPlugin.logger().log(Level.SEVERE, "ChildSettings is invalid");
         }
 
         DivorceSettings divorceSettings = getDataObject().getSocialGroupSettings().getDivorceSettings();
@@ -142,7 +170,7 @@ public class SettingsConfig extends JsonConfiguration<Settings> {
             // settingsMap.put(DivorceSettings.class, divorceSettings);
             settings.add(divorceSettings);
         } else {
-            logger.log(Level.SEVERE, "DivorceSettings is invalid");
+            SocialNetworkPlugin.logger().log(Level.SEVERE, "DivorceSettings is invalid");
         }
 
         EngagementSettings engagementSettings = getDataObject().getSocialGroupSettings().getEngagementSettings();
@@ -150,7 +178,7 @@ public class SettingsConfig extends JsonConfiguration<Settings> {
             // settingsMap.put(EngagementSettings.class, engagementSettings);
             settings.add(engagementSettings);
         } else {
-            logger.log(Level.SEVERE, "EngagementSettings is invalid");
+            SocialNetworkPlugin.logger().log(Level.SEVERE, "EngagementSettings is invalid");
         }
 
         FriendSettings friendSettings = getDataObject().getSocialGroupSettings().getFriendSettings();
@@ -158,7 +186,7 @@ public class SettingsConfig extends JsonConfiguration<Settings> {
             // settingsMap.put(FriendSettings.class, friendSettings);
             settings.add(friendSettings);
         } else {
-            logger.log(Level.SEVERE, "FriendSettings is invalid");
+            SocialNetworkPlugin.logger().log(Level.SEVERE, "FriendSettings is invalid");
         }
 
         LawyerSettings lawyerSettings = getDataObject().getSocialGroupSettings().getLawyerSettings();
@@ -166,7 +194,7 @@ public class SettingsConfig extends JsonConfiguration<Settings> {
             // settingsMap.put(LawyerSettings.class, lawyerSettings);
             settings.add(lawyerSettings);
         } else {
-            logger.log(Level.SEVERE, "LawyerSettings is invalid");
+            SocialNetworkPlugin.logger().log(Level.SEVERE, "LawyerSettings is invalid");
         }
 
         MarriageSettings marriageSettings = getDataObject().getSocialGroupSettings().getMarriageSettings();
@@ -174,7 +202,7 @@ public class SettingsConfig extends JsonConfiguration<Settings> {
             // settingsMap.put(MarriageSettings.class, marriageSettings);
             settings.add(marriageSettings);
         } else {
-            logger.log(Level.SEVERE, "MarriageSettings is invalid");
+            SocialNetworkPlugin.logger().log(Level.SEVERE, "MarriageSettings is invalid");
         }
 
         PriestSettings priestSettings = getDataObject().getSocialGroupSettings().getPriestSettings();
@@ -182,7 +210,7 @@ public class SettingsConfig extends JsonConfiguration<Settings> {
             // settingsMap.put(PriestSettings.class, priestSettings);
             settings.add(priestSettings);
         } else {
-            logger.log(Level.SEVERE, "PriestSettings is invalid");
+            SocialNetworkPlugin.logger().log(Level.SEVERE, "PriestSettings is invalid");
         }
 
         RelationshipSettings relationshipSettings = getDataObject().getSocialGroupSettings().getRelationshipSettings();
@@ -190,7 +218,7 @@ public class SettingsConfig extends JsonConfiguration<Settings> {
             // settingsMap.put(RelationshipSettings.class, relationshipSettings);
             settings.add(relationshipSettings);
         } else {
-            logger.log(Level.SEVERE, "RelationshipSettings is invalid");
+            SocialNetworkPlugin.logger().log(Level.SEVERE, "RelationshipSettings is invalid");
         }
 
         // sort the list by priority and add them to the settings map

@@ -1,6 +1,6 @@
 name: SocialNetwork
 main: com.netprogs.minecraft.plugins.social.SocialNetworkPlugin
-version: 1.1.1
+version: 1.2.1
 author: Scott Milne
 description: Provides social networking (dating, friendship, marriage etc).
 depend: [Vault]
@@ -22,10 +22,16 @@ permissions:
       children:
          social.join: true
          social.quit: true
+         social.gender: true
          social.alerts: true
          social.requests: true
          social.ignore: true
          social.online: true
+         social.lastlogin: true
+         social.status: true
+         social.profile: true
+         social.pausechat: true
+         social.mute: true
          social.help: true
    social.group.*:
       description: Gives access to all social group commands.
@@ -55,11 +61,17 @@ permissions:
    social.help:
       description: Ability to use help pages.
       default: true
+   social.admin:
+      description: Ability to use admin commands.
+      default: op
    social.join:
       description: Ability to join the network.
       default: op
    social.quit:
       description: Ability to quit the network.
+      default: op
+   social.gender:
+      description: Ability to choose a gender.
       default: op
    social.alerts:
       description: Ability to view available alerts.
@@ -72,6 +84,21 @@ permissions:
       default: op
    social.online:
       description: Ability to view all group members that are online.
+      default: op
+   social.lastlogin:
+      description: Ability to view the last login time of a player.
+      default: op
+   social.status:
+      description: Ability to update your status message.
+      default: op
+   social.profile:
+      description: Ability to view the profile of players.
+      default: op
+   social.pausechat:
+      description: Ability to pause your chat so you can read content from the network easier.
+      default: op
+   social.mute:
+      description: Ability to mute notifications from the network.
       default: op
    social.friend:
       description: Ability to add friends.

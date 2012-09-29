@@ -2,8 +2,9 @@ package com.netprogs.minecraft.plugins.social.command.social;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
+import java.util.Map;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommand;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommandType;
@@ -11,13 +12,13 @@ import com.netprogs.minecraft.plugins.social.command.exception.ArgumentsMissingE
 import com.netprogs.minecraft.plugins.social.command.exception.InvalidPermissionsException;
 import com.netprogs.minecraft.plugins.social.command.exception.SenderNotInNetworkException;
 import com.netprogs.minecraft.plugins.social.command.exception.SenderNotPlayerException;
+import com.netprogs.minecraft.plugins.social.command.help.HelpBook;
 import com.netprogs.minecraft.plugins.social.command.help.HelpMessage;
 import com.netprogs.minecraft.plugins.social.command.help.HelpSegment;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.ISocialNetworkSettings;
-import com.netprogs.minecraft.plugins.social.storage.SocialNetwork;
+import com.netprogs.minecraft.plugins.social.storage.SocialNetworkStorage;
 import com.netprogs.minecraft.plugins.social.storage.data.Alert;
 
 import org.bukkit.ChatColor;
@@ -46,8 +47,6 @@ import org.bukkit.entity.Player;
 
 public class CommandAlerts extends SocialNetworkCommand<ISocialNetworkSettings> {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
     public CommandAlerts() {
         super(SocialNetworkCommandType.alerts);
     }
@@ -72,7 +71,7 @@ public class CommandAlerts extends SocialNetworkCommand<ISocialNetworkSettings> 
         Player player = (Player) sender;
 
         // get the social network data
-        SocialNetwork socialConfig = SocialNetwork.getInstance();
+        SocialNetworkStorage socialConfig = SocialNetworkPlugin.getStorage();
 
         // check to see if the sender is part of the network
         SocialPerson person = socialConfig.getPerson(player.getName());
@@ -81,23 +80,26 @@ public class CommandAlerts extends SocialNetworkCommand<ISocialNetworkSettings> 
         }
 
         // group them by type
-        List<Alert> quitAlerts = new ArrayList<Alert>();
+        List<Alert> playerDeletedAlerts = new ArrayList<Alert>();
 
-        // get the list of requests from each player
-        for (String key : person.getMessagePlayers(Alert.class)) {
-            for (Alert alert : person.getMessagesFrom(key, Alert.class)) {
-                if (alert.getAlertType() == Alert.Type.quit) {
-                    quitAlerts.add(alert);
-                    person.removeMessage(key, alert);
+        // get the list of alerts from each player
+        Map<String, List<Alert>> alertMessageMap = person.getMessages(Alert.class);
+        for (String key : alertMessageMap.keySet()) {
+            for (Alert alert : alertMessageMap.get(key)) {
+                if (alert.getAlertType() == Alert.Type.deleted) {
+                    playerDeletedAlerts.add(alert);
                 }
             }
         }
 
+        // remove all their alerts since they're only one-shot views
+        person.removeAllAlerts();
+
         // save the person to remove the alerts
-        SocialNetwork.getInstance().savePerson(person);
+        SocialNetworkPlugin.getStorage().savePerson(person);
 
         // check to see if any of the lists got something added
-        boolean hasRequests = (quitAlerts.size() > 0);
+        boolean hasRequests = (playerDeletedAlerts.size() > 0);
 
         // send the header
         MessageUtil.sendHeaderMessage(sender, "social.alerts.header.sender");
@@ -109,12 +111,10 @@ public class CommandAlerts extends SocialNetworkCommand<ISocialNetworkSettings> 
         }
 
         // still here, time to display what we have
-        String quitTag =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                        .getResource("social.alerts.tag.quit.sender");
+        String playerDeletedTag = SocialNetworkPlugin.getResources().getResource("social.alerts.tag.deleted.sender");
 
         // okay, now we'll display them
-        displayRequests(player, quitTag, quitAlerts);
+        displayRequests(player, playerDeletedTag, playerDeletedAlerts);
 
         return true;
     }
@@ -132,13 +132,13 @@ public class CommandAlerts extends SocialNetworkCommand<ISocialNetworkSettings> 
     @Override
     public HelpSegment help() {
 
-        ResourcesConfig config = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
-
-        HelpMessage mainCommand = new HelpMessage();
-        mainCommand.setCommand(getCommandType().toString());
-        mainCommand.setDescription(config.getResource("social.alerts.help"));
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
 
         HelpSegment helpSegment = new HelpSegment(getCommandType());
+
+        HelpMessage mainCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), null, null,
+                        config.getResource("social.alerts.help"));
         helpSegment.addEntry(mainCommand);
 
         return helpSegment;

@@ -4,8 +4,9 @@ import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
+import java.util.Set;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.SocialPerson.WaitState;
 import com.netprogs.minecraft.plugins.social.command.IWaitCommand;
@@ -16,17 +17,14 @@ import com.netprogs.minecraft.plugins.social.command.exception.PlayerNotInNetwor
 import com.netprogs.minecraft.plugins.social.command.exception.PlayerNotOnlineException;
 import com.netprogs.minecraft.plugins.social.command.exception.SenderNotInNetworkException;
 import com.netprogs.minecraft.plugins.social.command.exception.SenderNotPlayerException;
+import com.netprogs.minecraft.plugins.social.command.help.HelpBook;
 import com.netprogs.minecraft.plugins.social.command.help.HelpMessage;
 import com.netprogs.minecraft.plugins.social.command.help.HelpSegment;
 import com.netprogs.minecraft.plugins.social.command.util.MessageParameter;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
-import com.netprogs.minecraft.plugins.social.config.settings.SettingsConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.perk.GiftSettings;
-import com.netprogs.minecraft.plugins.social.integration.VaultIntegration;
 import com.netprogs.minecraft.plugins.social.storage.IMessage;
-import com.netprogs.minecraft.plugins.social.storage.SocialNetwork;
 import com.netprogs.minecraft.plugins.social.storage.data.Gift;
 import com.netprogs.minecraft.plugins.social.storage.data.Gift.Type;
 import com.netprogs.minecraft.plugins.social.storage.data.perk.IPersonPerkSettings;
@@ -75,8 +73,6 @@ import org.bukkit.inventory.PlayerInventory;
  */
 public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> implements IWaitCommand {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
     public CommandGift() {
         super(SocialNetworkCommandType.gift);
     }
@@ -99,7 +95,7 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
         Player player = (Player) sender;
 
         // make sure the sender is in the network
-        SocialPerson playerPerson = SocialNetwork.getInstance().getPerson(player.getName());
+        SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(player.getName());
         if (playerPerson == null) {
             throw new SenderNotInNetworkException();
         }
@@ -126,9 +122,13 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
 
             return handleListGifts(player, playerPerson, arguments);
 
+        } else if (command.equals("read")) {
+
+            return handleOpenGifts(player, playerPerson, arguments, true);
+
         } else if (command.equals("open")) {
 
-            return handleOpenGifts(player, playerPerson, arguments);
+            return handleOpenGifts(player, playerPerson, arguments, false);
 
         } else if (command.equals("yes") && playerPerson.getWaitState() != WaitState.notWaiting) {
 
@@ -182,7 +182,7 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
             GiftSettings giftSettings = getPerkSettings(playerPerson, receivePerson);
             if (giftSettings != null) {
 
-                List<Gift> gifts = receivePerson.getMessagesFrom(playerPerson.getName(), Gift.class);
+                List<Gift> gifts = receivePerson.getMessagesFrom(playerPerson, Gift.class);
                 if (gifts.size() >= giftSettings.getMaximumNumber()) {
 
                     MessageUtil.sendMessage(player, "social.perk.gift.limitReached", ChatColor.RED,
@@ -193,7 +193,8 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
             }
 
             // create the gift message
-            Gift giftData = new Gift(Type.cash, playerPerson.getName(), receivePlayerName, amount);
+            Gift giftData =
+                    new Gift(Type.cash, playerPerson.getName(), receivePlayerName, player.getWorld().getName(), amount);
 
             NumberFormat formatter = new DecimalFormat("###.00");
             String itemDisplay = formatter.format(amount);
@@ -203,7 +204,7 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
                     giftData);
 
             // save their data in case they lose connection mid-way through a send
-            SocialNetwork.getInstance().savePerson(receivePerson);
+            SocialNetworkPlugin.getStorage().savePerson(receivePerson);
 
             return true;
         }
@@ -240,7 +241,7 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
                 GiftSettings giftSettings = getPerkSettings(playerPerson, receivePerson);
                 if (giftSettings != null) {
 
-                    List<Gift> gifts = receivePerson.getMessagesFrom(playerPerson.getName(), Gift.class);
+                    List<Gift> gifts = receivePerson.getMessagesFrom(playerPerson, Gift.class);
                     if (gifts.size() >= giftSettings.getMaximumNumber()) {
 
                         MessageUtil.sendMessage(player, "social.perk.gift.limitReached", ChatColor.RED,
@@ -251,8 +252,8 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
                 }
 
                 Gift giftData =
-                        new Gift(Type.item, playerPerson.getName(), receivePlayerName, itemStack.getTypeId(),
-                                itemStack.getAmount());
+                        new Gift(Type.item, playerPerson.getName(), receivePlayerName, player.getWorld().getName(),
+                                itemStack.getTypeId(), itemStack.getAmount());
 
                 // take the item from their inventory, if they choose not to send it, we'll give it back then
                 PlayerInventory inventory = player.getInventory();
@@ -271,7 +272,7 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
                         WaitState.waitCashGiftVerification, giftData);
 
                 // save their data in case they lose connection mid-way through a send
-                SocialNetwork.getInstance().savePerson(receivePerson);
+                SocialNetworkPlugin.getStorage().savePerson(receivePerson);
 
                 return true;
             }
@@ -292,7 +293,7 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
         MessageUtil.sendHeaderMessage(player, "social.perk.gift.list.header.sender");
 
         // send a response for each person with their message count
-        List<String> messagePlayers = playerPerson.getMessagePlayers(Gift.class);
+        Set<String> messagePlayers = playerPerson.getMessagePlayers(Gift.class);
         for (String playerName : messagePlayers) {
 
             int count = playerPerson.getMessageCountFrom(playerName, Gift.class);
@@ -315,12 +316,13 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
     }
 
     /**
-     * /s gift open <player> Open all the gifts from the player. Will delete after opening.
+     * /s gift open <player> Open all the gifts from the player. Will delete after opening if readOnly is false.
      * @param playerPerson
      * @param arguments
+     * @param readOnly If you only want to display the items instead of opening and receiving them.
      * @return
      */
-    private boolean handleOpenGifts(Player player, SocialPerson playerPerson, List<String> arguments)
+    private boolean handleOpenGifts(Player player, SocialPerson playerPerson, List<String> arguments, boolean readOnly)
             throws ArgumentsMissingException, PlayerNotInNetworkException {
 
         // check arguments
@@ -331,28 +333,43 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
         String messagePlayerName = arguments.get(0);
 
         // make sure the player is in the network
-        SocialPerson messagePerson = SocialNetwork.getInstance().getPerson(messagePlayerName);
+        SocialPerson messagePerson = SocialNetworkPlugin.getStorage().getPerson(messagePlayerName);
         if (messagePerson == null) {
             throw new PlayerNotInNetworkException(messagePlayerName);
         }
 
         // now read their messages
-        List<Gift> gifts = playerPerson.getMessagesFrom(messagePerson.getName(), Gift.class);
+        List<Gift> gifts = playerPerson.getMessagesFrom(messagePerson, Gift.class);
 
         // send a header
         MessageUtil.sendHeaderMessage(player, "social.perk.gift.read.header.sender");
 
+        int openCount = 0;
+
         // send the gifts
         for (Gift playerGift : gifts) {
 
+            // check to see if we should limit the gift to their world
+            boolean sameWorld = true;
+            if (!SocialNetworkPlugin.getSettings().isMultiWorldGiftsAllowed() && playerGift.getSenderWorld() != null) {
+                sameWorld = player.getWorld().getName().equals(playerGift.getSenderWorld());
+            }
+
+            // create the display parameters
             MessageParameter messageName =
                     new MessageParameter("<player>", playerGift.getSenderPlayerName(), ChatColor.AQUA);
+
+            MessageParameter messageWorld =
+                    new MessageParameter("<world>", playerGift.getSenderWorld(), ChatColor.AQUA);
+
             MessageParameter giftMessage = null;
 
             if (playerGift.getType() == Type.cash) {
 
                 // give the player the cash gift
-                VaultIntegration.getInstance().getEconomy().depositPlayer(player.getName(), playerGift.getAmount());
+                if (!readOnly && sameWorld) {
+                    SocialNetworkPlugin.getVault().getEconomy().depositPlayer(player.getName(), playerGift.getAmount());
+                }
 
                 // get the display name of the item received
                 NumberFormat formatter = new DecimalFormat("###.00");
@@ -363,8 +380,11 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
 
                 // Put it into their inventory
                 ItemStack itemStack = new ItemStack(playerGift.getItemId(), playerGift.getItemCount());
-                PlayerInventory inventory = player.getInventory();
-                inventory.addItem(itemStack);
+
+                if (!readOnly && sameWorld) {
+                    PlayerInventory inventory = player.getInventory();
+                    inventory.addItem(itemStack);
+                }
 
                 // get the display name of the item received
                 Material material = Material.getMaterial(itemStack.getTypeId());
@@ -373,13 +393,22 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
             }
 
             // tell them what they got
-            List<MessageParameter> requestParameters = new ArrayList<MessageParameter>();
-            requestParameters.add(messageName);
-            requestParameters.add(giftMessage);
-            MessageUtil.sendMessage(player, "social.perk.gift.read.item.sender", ChatColor.GREEN, requestParameters);
+            List<MessageParameter> msgParameters = new ArrayList<MessageParameter>();
+            msgParameters.add(messageName);
+            msgParameters.add(giftMessage);
+            msgParameters.add(messageWorld);
+
+            if (!readOnly && sameWorld) {
+                MessageUtil.sendMessage(player, "social.perk.gift.open.item.sender", ChatColor.GREEN, msgParameters);
+            } else {
+                MessageUtil.sendMessage(player, "social.perk.gift.read.item.sender", ChatColor.GREEN, msgParameters);
+            }
 
             // now remove the gift so they don't get it again
-            playerPerson.removeMessage(messagePerson.getName(), playerGift);
+            if (!readOnly && sameWorld) {
+                openCount++;
+                playerPerson.removeMessage(messagePerson, playerGift);
+            }
         }
 
         if (gifts.size() == 0) {
@@ -388,8 +417,21 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
 
         } else {
 
+            MessageUtil.sendFooterLinesOnly(player);
+
+            if (!SocialNetworkPlugin.getSettings().isMultiWorldGiftsAllowed()) {
+
+                if (!readOnly && openCount == 0) {
+                    MessageUtil.sendMessage(player, "social.perk.gift.multiWorld.noneAvailable", ChatColor.RED);
+                }
+
+                MessageUtil.sendMessage(player, "social.perk.gift.multiWorld.notice", ChatColor.GOLD);
+            }
+
             // save the person
-            SocialNetwork.getInstance().savePerson(playerPerson);
+            if (!readOnly) {
+                SocialNetworkPlugin.getStorage().savePerson(playerPerson);
+            }
         }
 
         return true;
@@ -423,10 +465,10 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
         }
 
         // place this message onto the other person's list
-        SocialPerson sendToPerson = SocialNetwork.getInstance().getPerson(gift.getReceiverPlayerName());
+        SocialPerson sendToPerson = SocialNetworkPlugin.getStorage().getPerson(gift.getReceiverPlayerName());
         if (sendToPerson != null) {
-            sendToPerson.addMessage(playerPerson.getName(), gift);
-            SocialNetwork.getInstance().savePerson(sendToPerson);
+            sendToPerson.addMessage(playerPerson, gift);
+            SocialNetworkPlugin.getStorage().savePerson(sendToPerson);
         }
 
         // tell them it's been sent
@@ -472,7 +514,7 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
             throws PlayerNotInNetworkException {
 
         // make sure the player is in the network
-        SocialPerson sendToPerson = SocialNetwork.getInstance().getPerson(receivePlayerName);
+        SocialPerson sendToPerson = SocialNetworkPlugin.getStorage().getPerson(receivePlayerName);
         if (sendToPerson == null) {
             throw new PlayerNotInNetworkException(receivePlayerName);
         }
@@ -486,14 +528,14 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
 
         // If I have them on ignore...
         // Check to see if the person they're trying to contact is on their own ignore list
-        if (playerPerson.isOnIgnore(sendToPerson.getName())) {
+        if (playerPerson.isOnIgnore(sendToPerson)) {
             MessageUtil.sendPlayerIgnoredMessage(player, sendToPerson.getName());
             return null;
         }
 
         // If they have me on ignore...
         // Check to see if the person they're trying to contact has them on their ignore list
-        if (sendToPerson.isOnIgnore(playerPerson.getName())) {
+        if (sendToPerson.isOnIgnore(playerPerson)) {
             MessageUtil.sendSenderIgnoredMessage(player, sendToPerson.getName());
             return null;
         }
@@ -524,16 +566,12 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
 
     private boolean preAuthCashGift(Player player, double price) {
 
-        if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-            logger.info("[PreAuth] Found gift cash: " + price);
-        }
+        SocialNetworkPlugin.log("[PreAuth] Found gift cash: " + price);
 
         // now check to see if they have enough money to run the perk
-        if (!VaultIntegration.getInstance().getEconomy().has(player.getName(), price)) {
+        if (!SocialNetworkPlugin.getVault().getEconomy().has(player.getName(), price)) {
 
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("[PreAuth] Not enough funds for gift: " + price);
-            }
+            SocialNetworkPlugin.log("[PreAuth] Not enough funds for gift: " + price);
 
             NumberFormat formatter = new DecimalFormat("###.00");
             String itemDisplay = formatter.format(price);
@@ -551,20 +589,16 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
     private boolean processCashGift(Player player, double price) {
 
         // now check to see if they have enough money to pay for the gift
-        if (VaultIntegration.getInstance().getEconomy().has(player.getName(), price)) {
+        if (SocialNetworkPlugin.getVault().getEconomy().has(player.getName(), price)) {
 
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("[purchase] Charging gift price: " + price);
-            }
+            SocialNetworkPlugin.log("[purchase] Charging gift price: " + price);
 
             // do the actual purchase now
-            VaultIntegration.getInstance().getEconomy().withdrawPlayer(player.getName(), price);
+            SocialNetworkPlugin.getVault().getEconomy().withdrawPlayer(player.getName(), price);
 
         } else {
 
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("[purchase] Not enough funds for gift: " + price);
-            }
+            SocialNetworkPlugin.log("[purchase] Not enough funds for gift: " + price);
 
             NumberFormat formatter = new DecimalFormat("###.00");
             String itemDisplay = formatter.format(price);
@@ -636,7 +670,7 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
 
             // get the gift and determine the type
             Gift gift = person.getWaitData();
-            SocialPerson sendToPerson = SocialNetwork.getInstance().getPerson(gift.getReceiverPlayerName());
+            SocialPerson sendToPerson = SocialNetworkPlugin.getStorage().getPerson(gift.getReceiverPlayerName());
             if (sendToPerson != null) {
                 return getPerkSettings(person, sendToPerson);
             }
@@ -692,31 +726,32 @@ public class CommandGift extends PerkCommand<GiftSettings, IPersonPerkSettings> 
     public HelpSegment help() {
 
         HelpSegment helpSegment = new HelpSegment(getCommandType());
-        ResourcesConfig config = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
 
-        HelpMessage cashCommand = new HelpMessage();
-        cashCommand.setCommand(getCommandType().toString());
-        cashCommand.setArguments("cash <amount> <player>");
-        cashCommand.setDescription(config.getResource("social.perk.gift.help.send.cash"));
+        HelpMessage cashCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "cash", "<amount> <player>",
+                        config.getResource("social.perk.gift.help.send.cash"));
         helpSegment.addEntry(cashCommand);
 
-        HelpMessage handCommand = new HelpMessage();
-        handCommand.setCommand(getCommandType().toString());
-        handCommand.setArguments("hand <player>");
-        handCommand.setDescription(config.getResource("social.perk.gift.help.send.item"));
+        HelpMessage handCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "hand", "<player>",
+                        config.getResource("social.perk.gift.help.send.item"));
         helpSegment.addEntry(handCommand);
 
-        HelpMessage tyCommand = new HelpMessage();
-        tyCommand.setCommand(getCommandType().toString());
-        tyCommand.setArguments("list");
-        tyCommand.setDescription(config.getResource("social.perk.gift.help.list"));
-        helpSegment.addEntry(tyCommand);
+        HelpMessage listCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "list", null,
+                        config.getResource("social.perk.gift.help.list"));
+        helpSegment.addEntry(listCommand);
 
-        HelpMessage tmCommand = new HelpMessage();
-        tmCommand.setCommand(getCommandType().toString());
-        tmCommand.setArguments("open <player>");
-        tmCommand.setDescription(config.getResource("social.perk.gift.help.open"));
-        helpSegment.addEntry(tmCommand);
+        HelpMessage readCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "read", "<player>",
+                        config.getResource("social.perk.gift.help.read"));
+        helpSegment.addEntry(readCommand);
+
+        HelpMessage openCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "open", "<player>",
+                        config.getResource("social.perk.gift.help.open"));
+        helpSegment.addEntry(openCommand);
 
         return helpSegment;
     }

@@ -26,5 +26,5 @@ import com.netprogs.minecraft.plugins.social.listener.perk.IPerkListener.IListen
  * This is used to relate settings and resources.
  */
 public enum ListenerType implements IListenerType {
-    damage, worldguard, lwc
+    damage, worldguard, lwc, bonusxp, healthregen, foodshare
 }

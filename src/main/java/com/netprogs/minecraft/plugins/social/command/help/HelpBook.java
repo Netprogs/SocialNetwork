@@ -4,10 +4,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
+import com.netprogs.minecraft.plugins.social.SocialPerson;
+import com.netprogs.minecraft.plugins.social.command.ISocialNetworkCommand;
+import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommandType;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
-import com.netprogs.minecraft.plugins.social.integration.VaultIntegration;
+import com.netprogs.minecraft.plugins.social.config.settings.CommandMapSettings;
+import com.netprogs.minecraft.plugins.social.config.settings.ISocialNetworkSettings;
 
 import org.apache.commons.lang.StringUtils;
 import org.bukkit.ChatColor;
@@ -44,24 +47,67 @@ import org.bukkit.command.CommandSender;
  */
 public class HelpBook {
 
-    public static ChatColor COMMAND_COLOR = ChatColor.AQUA;
-    public static ChatColor DESCRIPTION_COLOR = ChatColor.YELLOW;
+    public final static ChatColor COMMAND_COLOR = ChatColor.AQUA;
+    public final static ChatColor DESCRIPTION_COLOR = ChatColor.YELLOW;
 
-    public static ChatColor SPACER_COLOR = ChatColor.YELLOW;
+    public final static ChatColor SPACER_COLOR = ChatColor.YELLOW;
 
-    public static ChatColor SEGMENT_TITLE_COLOR = ChatColor.LIGHT_PURPLE;
+    public final static ChatColor SEGMENT_TITLE_COLOR = ChatColor.LIGHT_PURPLE;
 
-    public static String TITLE_COLOR = "&a";
-    public static String PAGE_TITLE_COLOR = "&d";
-    public static String PARAMS_COLOR = "&3";
+    public final static String TITLE_COLOR = "&a";
+    public final static String PAGE_TITLE_COLOR = "&d";
+    public final static String PARAMS_COLOR = "&3";
 
-    private static List<HelpPage> helpPages = new ArrayList<HelpPage>();
+    private List<HelpPage> helpPages;
 
-    public static void addPage(HelpPage page) {
+    public HelpBook() {
+
+        helpPages = new ArrayList<HelpPage>();
+    }
+
+    public static HelpMessage generateHelpMessage(String mainCommand, String subCommand, String arguments,
+            String description) {
+
+        CommandMapSettings customMapSettings = SocialNetworkPlugin.getSettings().getCommandMapSettings();
+
+        String command = "";
+        if (StringUtils.isNotEmpty(mainCommand)) {
+            command += mainCommand;
+        }
+
+        if (StringUtils.isNotEmpty(subCommand)) {
+            if (StringUtils.isNotEmpty(command)) {
+                command += " ";
+            }
+            command += subCommand;
+        }
+
+        String customRequestCommand = customMapSettings.getCustomCommand(command);
+
+        HelpMessage helpMessage = new HelpMessage();
+
+        if (customRequestCommand != null && customMapSettings.isEnabled()) {
+
+            helpMessage.setCommand(customRequestCommand);
+
+        } else {
+
+            helpMessage.setCommand(command);
+        }
+
+        helpMessage.setArguments(arguments);
+        helpMessage.setDescription(description);
+
+        return helpMessage;
+    }
+
+    public void addPage(HelpPage page) {
         helpPages.add(page);
     }
 
-    public static boolean sendHelpPage(CommandSender sender, int pageNumber) {
+    public boolean sendHelpPage(CommandSender sender, String pluginName, int pageNumber) {
+
+        SocialPerson senderPerson = SocialNetworkPlugin.getStorage().getPerson(sender.getName());
 
         // Go through the pages and for each segment within it, determine if the user is allowed to use that command
         // Each segment is given the permission so we just use that.
@@ -70,39 +116,54 @@ public class HelpBook {
         for (HelpPage helpPage : helpPages) {
 
             HelpPage newHelpPage = new HelpPage(helpPage.getTitle());
-            for (HelpSegment helpSegment : helpPage.getSegments()) {
+
+            for (ISocialNetworkCommand<? extends ISocialNetworkSettings> helpCommand : helpPage.getCommands()) {
 
                 // if they're allowed access, add the segment
-                if (VaultIntegration.getInstance().hasCommandPermission(sender, helpSegment.getCommandType())) {
-                    newHelpPage.addSegment(helpSegment);
+                if (SocialNetworkPlugin.getVault().hasCommandPermission(sender, helpCommand.getCommandType())) {
+                    newHelpPage.addCommand(helpCommand);
+                }
+
+                if (senderPerson != null) {
+                    if (helpCommand.getCommandType() == SocialNetworkCommandType.priest && senderPerson.isPriest()) {
+
+                        newHelpPage.addCommand(helpCommand);
+                    }
+                }
+
+                if (senderPerson != null) {
+                    if (helpCommand.getCommandType() == SocialNetworkCommandType.lawyer && senderPerson.isLawyer()) {
+
+                        newHelpPage.addCommand(helpCommand);
+                    }
                 }
             }
 
             // if there are any segments left, add the page to the pages list
-            if (newHelpPage.getSegments().size() > 0) {
+            if (newHelpPage.getCommands().size() > 0) {
                 availableHelpPages.add(newHelpPage);
             }
         }
 
         // create and send the help title
-        String header = createHeader(availableHelpPages, pageNumber);
+        String header = createHeader(pluginName, availableHelpPages, pageNumber);
         sendMessage(sender, header);
 
         // get the resources
-        ResourcesConfig resources = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
-
-        // check to make sure the page number is valid
-        if (pageNumber <= 0 || pageNumber > availableHelpPages.size()) {
-
-            String helpTitle = resources.getResource("social.help.wrongPage");
-            sendMessage(sender, ChatColor.RED + helpTitle);
-            return false;
-        }
+        ResourcesConfig resources = SocialNetworkPlugin.getResources();
 
         // check to see if the user has any pages available to them
         if (availableHelpPages.size() == 0) {
 
             String helpTitle = resources.getResource("social.help.noneAvailable");
+            sendMessage(sender, ChatColor.RED + helpTitle);
+            return false;
+        }
+
+        // check to make sure the page number is valid
+        if (pageNumber <= 0 || pageNumber > availableHelpPages.size()) {
+
+            String helpTitle = resources.getResource("social.help.wrongPage");
             sendMessage(sender, ChatColor.RED + helpTitle);
             return false;
         }
@@ -116,7 +177,7 @@ public class HelpBook {
         return true;
     }
 
-    private static void generateHelpMessages(CommandSender sender, HelpPage helpPage) {
+    private void generateHelpMessages(CommandSender sender, HelpPage helpPage) {
 
         // if there was a title, display it now
         if (!StringUtils.isEmpty(helpPage.getTitle())) {
@@ -124,7 +185,9 @@ public class HelpBook {
         }
 
         // now display every segment that was added to this page
-        for (HelpSegment helpSegment : helpPage.getSegments()) {
+        for (ISocialNetworkCommand<? extends ISocialNetworkSettings> helpCommand : helpPage.getCommands()) {
+
+            HelpSegment helpSegment = helpCommand.help();
 
             // if there was a title, display it now
             if (!StringUtils.isEmpty(helpSegment.getTitle())) {
@@ -138,21 +201,24 @@ public class HelpBook {
         }
     }
 
-    private static void sendMessage(CommandSender receiver, String message) {
+    private void sendMessage(CommandSender receiver, String message) {
 
         message = message.replaceAll("(&([A-Fa-f0-9L-Ol-o]))", "\u00A7$2");
         receiver.sendMessage(message);
     }
 
-    private static String createHeader(List<HelpPage> helpPageList, int pageNumber) {
+    private String createHeader(String pluginName, List<HelpPage> helpPageList, int pageNumber) {
 
-        ResourcesConfig resources = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
+        ResourcesConfig resources = SocialNetworkPlugin.getResources();
 
         // create our header
         String helpTitle = resources.getResource("social.help.header");
         helpTitle = " " + helpTitle + " ";
-        helpTitle = helpTitle.replaceAll("<plugin>", SocialNetworkPlugin.instance.getPluginName());
-        helpTitle += " (" + pageNumber + "/" + helpPageList.size() + ") ";
+        helpTitle = helpTitle.replaceAll("<plugin>", pluginName);
+
+        if (helpPageList.size() > 0) {
+            helpTitle += " (" + pageNumber + "/" + helpPageList.size() + ") ";
+        }
 
         String headerSpacer = StringUtils.repeat("-", 52);
 

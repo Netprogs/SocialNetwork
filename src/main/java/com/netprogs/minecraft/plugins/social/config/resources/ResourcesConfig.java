@@ -1,6 +1,6 @@
 package com.netprogs.minecraft.plugins.social.config.resources;
 
-import com.netprogs.minecraft.plugins.social.config.JsonConfiguration;
+import com.netprogs.minecraft.plugins.social.io.JsonConfiguration;
 
 /*
  * "Social Network" is a Craftbukkit Minecraft server modification plug-in. It attempts to add a 

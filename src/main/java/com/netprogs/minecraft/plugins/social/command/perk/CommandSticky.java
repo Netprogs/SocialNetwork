@@ -2,8 +2,9 @@ package com.netprogs.minecraft.plugins.social.command.perk;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
+import java.util.Set;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommandType;
 import com.netprogs.minecraft.plugins.social.command.exception.ArgumentsMissingException;
@@ -12,14 +13,13 @@ import com.netprogs.minecraft.plugins.social.command.exception.PlayerNotInNetwor
 import com.netprogs.minecraft.plugins.social.command.exception.PlayerNotOnlineException;
 import com.netprogs.minecraft.plugins.social.command.exception.SenderNotInNetworkException;
 import com.netprogs.minecraft.plugins.social.command.exception.SenderNotPlayerException;
+import com.netprogs.minecraft.plugins.social.command.help.HelpBook;
 import com.netprogs.minecraft.plugins.social.command.help.HelpMessage;
 import com.netprogs.minecraft.plugins.social.command.help.HelpSegment;
 import com.netprogs.minecraft.plugins.social.command.util.MessageParameter;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.perk.StickySettings;
-import com.netprogs.minecraft.plugins.social.storage.SocialNetwork;
 import com.netprogs.minecraft.plugins.social.storage.data.Sticky;
 import com.netprogs.minecraft.plugins.social.storage.data.perk.IPersonPerkSettings;
 
@@ -62,8 +62,6 @@ import org.bukkit.entity.Player;
  */
 public class CommandSticky extends PerkCommand<StickySettings, IPersonPerkSettings> {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
     public CommandSticky() {
         super(SocialNetworkCommandType.sticky);
     }
@@ -86,7 +84,7 @@ public class CommandSticky extends PerkCommand<StickySettings, IPersonPerkSettin
         Player player = (Player) sender;
 
         // make sure the sender is in the network
-        SocialPerson playerPerson = SocialNetwork.getInstance().getPerson(player.getName());
+        SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(player.getName());
         if (playerPerson == null) {
             throw new SenderNotInNetworkException();
         }
@@ -112,7 +110,7 @@ public class CommandSticky extends PerkCommand<StickySettings, IPersonPerkSettin
             }
 
             // make sure the player is in the network
-            SocialPerson sendToPerson = SocialNetwork.getInstance().getPerson(sendPlayerName);
+            SocialPerson sendToPerson = SocialNetworkPlugin.getStorage().getPerson(sendPlayerName);
             if (sendToPerson == null) {
                 throw new PlayerNotInNetworkException(sendPlayerName);
             }
@@ -126,14 +124,14 @@ public class CommandSticky extends PerkCommand<StickySettings, IPersonPerkSettin
 
             // If I have them on ignore...
             // Check to see if the person they're trying to contact is on their own ignore list
-            if (playerPerson.isOnIgnore(sendToPerson.getName())) {
+            if (playerPerson.isOnIgnore(sendToPerson)) {
                 MessageUtil.sendPlayerIgnoredMessage(player, sendToPerson.getName());
                 return false;
             }
 
             // If they have me on ignore...
             // Check to see if the person they're trying to contact has them on their ignore list
-            if (sendToPerson.isOnIgnore(playerPerson.getName())) {
+            if (sendToPerson.isOnIgnore(playerPerson)) {
                 MessageUtil.sendSenderIgnoredMessage(player, sendToPerson.getName());
                 return false;
             }
@@ -141,7 +139,7 @@ public class CommandSticky extends PerkCommand<StickySettings, IPersonPerkSettin
             // check to see if we've reached out limit on how many stickies we can send them
             if (stickySettings != null) {
 
-                List<Sticky> stickies = sendToPerson.getMessagesFrom(playerPerson.getName(), Sticky.class);
+                List<Sticky> stickies = sendToPerson.getMessagesFrom(playerPerson, Sticky.class);
                 if (stickies.size() >= stickySettings.getMaximumNumber()) {
 
                     MessageUtil.sendMessage(player, "social.perk.sticky.limitReached", ChatColor.RED,
@@ -155,8 +153,8 @@ public class CommandSticky extends PerkCommand<StickySettings, IPersonPerkSettin
             Sticky sticky = new Sticky(playerPerson.getName(), message);
 
             // and throw it onto the message queue
-            sendToPerson.addMessage(playerPerson.getName(), sticky);
-            SocialNetwork.getInstance().savePerson(sendToPerson);
+            sendToPerson.addMessage(playerPerson, sticky);
+            SocialNetworkPlugin.getStorage().savePerson(sendToPerson);
 
             // tell them it's been sent
             MessageUtil.sendMessage(player, "social.perk.sticky.send.completed.sender", ChatColor.GREEN);
@@ -177,7 +175,7 @@ public class CommandSticky extends PerkCommand<StickySettings, IPersonPerkSettin
                 MessageUtil.sendHeaderMessage(player, "social.perk.sticky.list.header.sender");
 
                 // send a response for each person with their message count
-                List<String> messagePlayers = playerPerson.getMessagePlayers(Sticky.class);
+                Set<String> messagePlayers = playerPerson.getMessagePlayers(Sticky.class);
                 for (String playerName : messagePlayers) {
 
                     int count = playerPerson.getMessageCountFrom(playerName, Sticky.class);
@@ -210,13 +208,13 @@ public class CommandSticky extends PerkCommand<StickySettings, IPersonPerkSettin
                 String messagePlayerName = arguments.get(1);
 
                 // make sure the player is in the network
-                SocialPerson messagePerson = SocialNetwork.getInstance().getPerson(messagePlayerName);
+                SocialPerson messagePerson = SocialNetworkPlugin.getStorage().getPerson(messagePlayerName);
                 if (messagePerson == null) {
                     throw new PlayerNotInNetworkException(messagePlayerName);
                 }
 
                 // now read their messages
-                List<Sticky> stickies = playerPerson.getMessagesFrom(messagePerson.getName(), Sticky.class);
+                List<Sticky> stickies = playerPerson.getMessagesFrom(messagePerson, Sticky.class);
 
                 // send a header
                 MessageUtil.sendHeaderMessage(player, "social.perk.sticky.read.header.sender");
@@ -254,19 +252,19 @@ public class CommandSticky extends PerkCommand<StickySettings, IPersonPerkSettin
                 String messagePlayerName = arguments.get(1);
 
                 // make sure the player is in the network
-                SocialPerson messagePerson = SocialNetwork.getInstance().getPerson(messagePlayerName);
+                SocialPerson messagePerson = SocialNetworkPlugin.getStorage().getPerson(messagePlayerName);
                 if (messagePerson == null) {
                     throw new PlayerNotInNetworkException(messagePlayerName);
                 }
 
                 // get their messages and delete each one
-                List<Sticky> stickies = playerPerson.getMessagesFrom(messagePerson.getName(), Sticky.class);
+                List<Sticky> stickies = playerPerson.getMessagesFrom(messagePerson, Sticky.class);
                 for (Sticky playerSticky : stickies) {
-                    playerPerson.removeMessage(messagePerson.getName(), playerSticky);
+                    playerPerson.removeMessage(messagePerson, playerSticky);
                 }
 
                 // save the person
-                SocialNetwork.getInstance().savePerson(playerPerson);
+                SocialNetworkPlugin.getStorage().savePerson(playerPerson);
 
                 // tell them we're done
                 MessageUtil.sendMessage(player, "social.perk.sticky.delete.completed.sender", ChatColor.GREEN,
@@ -339,7 +337,7 @@ public class CommandSticky extends PerkCommand<StickySettings, IPersonPerkSettin
             // if here, the first command should be the receiver name
             String sendPlayerName = command;
 
-            SocialPerson sendToPerson = SocialNetwork.getInstance().getPerson(sendPlayerName);
+            SocialPerson sendToPerson = SocialNetworkPlugin.getStorage().getPerson(sendPlayerName);
             if (sendToPerson != null) {
                 return getPerkSettings(person, sendToPerson);
             }
@@ -359,31 +357,27 @@ public class CommandSticky extends PerkCommand<StickySettings, IPersonPerkSettin
     public HelpSegment help() {
 
         HelpSegment helpSegment = new HelpSegment(getCommandType());
-        ResourcesConfig config = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
 
-        HelpMessage mainCommand = new HelpMessage();
-        mainCommand.setCommand(getCommandType().toString());
-        mainCommand.setArguments("<player> <message>");
-        mainCommand.setDescription(config.getResource("social.perk.sticky.help.send"));
+        HelpMessage mainCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), null, "<player> <message>",
+                        config.getResource("social.perk.sticky.help.send"));
         helpSegment.addEntry(mainCommand);
 
-        HelpMessage setHomeCommand = new HelpMessage();
-        setHomeCommand.setCommand(getCommandType().toString());
-        setHomeCommand.setArguments("list");
-        setHomeCommand.setDescription(config.getResource("social.perk.sticky.help.list"));
-        helpSegment.addEntry(setHomeCommand);
+        HelpMessage listCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "list", null,
+                        config.getResource("social.perk.sticky.help.list"));
+        helpSegment.addEntry(listCommand);
 
-        HelpMessage tyCommand = new HelpMessage();
-        tyCommand.setCommand(getCommandType().toString());
-        tyCommand.setArguments("read <player>");
-        tyCommand.setDescription(config.getResource("social.perk.sticky.help.read"));
-        helpSegment.addEntry(tyCommand);
+        HelpMessage readCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "read", "<player>",
+                        config.getResource("social.perk.sticky.help.read"));
+        helpSegment.addEntry(readCommand);
 
-        HelpMessage tmCommand = new HelpMessage();
-        tmCommand.setCommand(getCommandType().toString());
-        tmCommand.setArguments("delete <player>");
-        tmCommand.setDescription(config.getResource("social.perk.sticky.help.delete"));
-        helpSegment.addEntry(tmCommand);
+        HelpMessage deleteCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "delete", "<player>",
+                        config.getResource("social.perk.sticky.help.delete"));
+        helpSegment.addEntry(deleteCommand);
 
         return helpSegment;
     }

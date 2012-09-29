@@ -1,7 +1,6 @@
 package com.netprogs.minecraft.plugins.social.integration;
 
 import java.util.Map;
-import java.util.logging.Logger;
 
 import com.sk89q.worldguard.bukkit.WorldGuardPlugin;
 import com.sk89q.worldguard.domains.DefaultDomain;
@@ -12,7 +11,6 @@ import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.plugin.PluginDescriptionFile;
 
 /*
  * Copyright (C) 2012 Scott Milne
@@ -36,41 +34,33 @@ import org.bukkit.plugin.PluginDescriptionFile;
 
 public class WorldGuardIntegration extends PluginIntegration {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
     private boolean isPluginLoaded = false;
 
-    private PluginDescriptionFile pdfFile;
     private WorldGuardPlugin worldGuard;
 
-    private static final WorldGuardIntegration SINGLETON = new WorldGuardIntegration();
-
-    public static WorldGuardIntegration getInstance() {
-        return SINGLETON;
+    public WorldGuardIntegration(Plugin plugin, boolean isLoggingDebug) {
+        super(plugin, isLoggingDebug);
     }
 
     @Override
-    public void initialize(Plugin plugin) {
+    public void initialize() {
 
         isPluginLoaded = false;
 
-        // get the plug-in description file
-        pdfFile = plugin.getDescription();
-
         // try to find WorldGuard and verify that the plug-in found under that name actually is one
-        Plugin loadedPlugin = plugin.getServer().getPluginManager().getPlugin("WorldGuard");
+        Plugin loadedPlugin = Bukkit.getServer().getPluginManager().getPlugin("WorldGuard");
         if ((loadedPlugin == null) || (!(loadedPlugin instanceof WorldGuardPlugin))) {
 
             // not found, don't allow features using it to be enabled
             worldGuard = null;
-            logger.info(getPluginName() + "Could not find WorldGuard; features are disabled.");
+            getPlugin().getLogger().info("Could not find WorldGuard; features are disabled.");
             return;
 
         } else {
 
             // we found it, so now we can use it
             worldGuard = (WorldGuardPlugin) loadedPlugin;
-            logger.info(getPluginName() + "Found WorldGuard; features can be enabled.");
+            getPlugin().getLogger().info("Found WorldGuard; features can be enabled.");
         }
 
         isPluginLoaded = true;
@@ -85,10 +75,6 @@ public class WorldGuardIntegration extends PluginIntegration {
     protected boolean isPluginEnabled() {
         // we have to have this, so don't allow config to turn it off
         return true;
-    }
-
-    private String getPluginName() {
-        return "[" + pdfFile.getName() + "] ";
     }
 
     public void addMemberToRegion(String playerName, String memberName) {

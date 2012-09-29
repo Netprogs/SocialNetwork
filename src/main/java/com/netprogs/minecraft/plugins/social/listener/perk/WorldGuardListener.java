@@ -1,15 +1,10 @@
 package com.netprogs.minecraft.plugins.social.listener.perk;
 
-import java.util.logging.Logger;
-
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
-import com.netprogs.minecraft.plugins.social.config.settings.SettingsConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.perk.WorldGuardSettings;
 import com.netprogs.minecraft.plugins.social.event.PlayerMemberChangeEvent;
 import com.netprogs.minecraft.plugins.social.event.PlayerMemberChangeEvent.Type;
-import com.netprogs.minecraft.plugins.social.integration.WorldGuardIntegration;
-import com.netprogs.minecraft.plugins.social.storage.SocialNetwork;
 import com.netprogs.minecraft.plugins.social.storage.data.perk.IPersonPerkSettings;
 
 import org.bukkit.event.EventHandler;
@@ -37,8 +32,6 @@ import org.bukkit.event.EventPriority;
 
 public class WorldGuardListener extends PerkListener<WorldGuardSettings, IPersonPerkSettings> {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
     public WorldGuardListener() {
         super(ListenerType.worldguard);
     }
@@ -46,14 +39,14 @@ public class WorldGuardListener extends PerkListener<WorldGuardSettings, IPerson
     @EventHandler(priority = EventPriority.NORMAL)
     public void onPlayerMemberChangeEvent(PlayerMemberChangeEvent event) {
 
-        // if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
+        // if (SocialNetworkPlugin.getSettings().isLoggingDebug()) {
         // logger.info("WG: listener " + event.getPlayerName() + " " + event.getEventType() + " "
         // + event.getMemberName() + " to/from " + event.getGroupType());
         // }
 
         // Something changed with your group members. Let's check to see if anyone left.
-        SocialPerson playerPerson = SocialNetwork.getInstance().getPerson(event.getPlayerName());
-        SocialPerson memberPerson = SocialNetwork.getInstance().getPerson(event.getMemberName());
+        SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(event.getPlayerName());
+        SocialPerson memberPerson = SocialNetworkPlugin.getStorage().getPerson(event.getMemberName());
         if (playerPerson != null && memberPerson != null) {
 
             if (event.getEventType() == Type.postAdd) {
@@ -62,13 +55,11 @@ public class WorldGuardListener extends PerkListener<WorldGuardSettings, IPerson
                 WorldGuardSettings worldGuardSettings = getPerkSettings(playerPerson, memberPerson);
                 if (worldGuardSettings != null) {
 
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("WG: " + playerPerson.getName() + " is adding " + memberPerson.getName()
-                                + " as Member.");
-                    }
+                    SocialNetworkPlugin.log("WG: " + playerPerson.getName() + " is adding " + memberPerson.getName()
+                            + " as Member.");
 
                     // add them to the players region
-                    WorldGuardIntegration.getInstance().addMemberToRegion(playerPerson.getName(),
+                    SocialNetworkPlugin.getWorldGuard().addMemberToRegion(playerPerson.getName(),
                             memberPerson.getName());
                 }
 
@@ -79,13 +70,11 @@ public class WorldGuardListener extends PerkListener<WorldGuardSettings, IPerson
                 WorldGuardSettings worldGuardSettings = getPerkSettings(playerPerson, memberPerson);
                 if (worldGuardSettings == null) {
 
-                    if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                        logger.info("WG: " + playerPerson.getName() + " is removing " + memberPerson.getName()
-                                + " as Member.");
-                    }
+                    SocialNetworkPlugin.log("WG: " + playerPerson.getName() + " is removing " + memberPerson.getName()
+                            + " as Member.");
 
                     // add them to the players region as a member
-                    WorldGuardIntegration.getInstance().removeMemberFromRegion(playerPerson.getName(),
+                    SocialNetworkPlugin.getWorldGuard().removeMemberFromRegion(playerPerson.getName(),
                             memberPerson.getName());
                 }
             }

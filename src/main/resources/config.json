@@ -1,138 +1,372 @@
 {
+  // If you want to have all players automatically joined into the network upon login, set this to true.
+  // Setting this to false will then require all players to use the /social join command in order to use the network.
+  "autoJoinOnLogin": true,
+  
+  // If you want players to have to choose a gender upon logging in, set this to true.
+  // This will cause players to have their moment stopped and be given a command to choose their gender.
+  // They will not be allowed to move or use any social network commands until they make a choice.
   "genderChoiceRequired": true,
+
+  // Only used when genderChoiceRequired is set to true.
+  // Make players unable to move until they make a gender choice.
+  "genderChoiceFreezeEnabled": false,
+
+  // Only used when genderChoiceRequired is set to true.
+  // Send players a reminder to chose their Gender each time they login.
+  "genderChoiceReminderEnabled": true,
+
+  // If you do not wish to allow same-gender Marriage, then set this to false.
   "sameGenderMarriageAllowed": true,
+
+  // When a couple is married we announce this through global chat. If you do not want that to happen, set this to false.
   "globalAnnouncePriestMarriages": true,
+
+  // The period of time, in seconds, that must pass before another login/out notification from the same player will be posted.
+  "loginNotificationCooldown": 10,
+  
+  // The period of time, in seconds, that must pass before another status update notification from the same player will be posted.
+  "statusMessageNotificationCooldown": 30,
+  
+  // If you do not want players to be able to send gifts to each other in different worlds, set this to false.
+  "multiWorldGiftsAllowed": false,
+
+  // This is used to provide debug information should you need to provide it for issue resolution.
   "loggingDebug": false,
-  "groupSettings": {
-    "childSettings": {
-      "maximumChildren": 30,
-      "priority": "LOWEST",
-      "perUseCost": 0.0,
-      "perks": [
-        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc"
-      ]
-    },
-    "friendSettings": {
-      "maximumFriends": 30,
-      "priority": "LOWEST",
-      "perUseCost": 0.0,
-      "perks": [
-        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc"
-      ]
-    },
-    "relationshipSettings": {
-      "maximumRelationships": 30,
-      "priority": "LOWEST",
-      "perUseCost": 0.0,
-      "perks": [
-        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc"
-      ]
-    },
-    "affairSettings": {
-      "maximumAffairs": 30,
-      "priority": "LOWEST",
-      "perUseCost": 0.0,
-      "perks": [
-        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc"
-      ]
-    },
-    "engagementSettings": {
-      "engagementPeriod": 300,
-      "priority": "LOWEST",
-      "perUseCost": 50.0,
-      "perks": [
-        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc"
-      ]
-    },
-    "divorceSettings": {
-      "bitternessPeriod": 300,
-      "priority": "LOWEST",
-      "perUseCost": 50.0,
-      "perks": [
-        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc"
-      ]
-    },
-    "marriageSettings": {
-      "honeymoonPeriod": 300,
-      "priority": "LOWEST",
-      "perUseCost": 0.0,
-      "perks": [
-        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc"
-      ]
-    },
-    "lawyerSettings": {
-      "bitternessPeriod": 0,
-      "priority": "LOWEST",
-      "perUseCost": 500.0,
-      "perks": [
-        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc"
-      ]
-    },
-    "priestSettings": {
-      "honeymoonPeriod": 0,
-      "priority": "LOWEST",
-      "perUseCost": 500.0,
-      "perks": [
-        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc"
-      ]
-    }
-  },
+
+  //
+  // This defines the Perk configuration you wish to have available to each social group.
+  // Below is a basic setup, giving each social group all the same Perk configurations.
+  // You can add/remove each perk from the social group "perks" list if you do not want that particular social group to have that Perk.
+  // 
+  // For advanced configurations, please see our Wiki: http://github.com/Netprogs/SocialNetwork/wiki/Configuration
+  //
   "perkSettings": [
     {
-      "type": "com.netprogs.minecraft.plugins.social.config.settings.perk.GiftSettings",
+      // This defines the settings for the "/social gift" Perk.
+      "type": "GiftSettings",
       "data": {
+        
+        // The name here can be anything you want but must match the same name below in the social group "perks" list.
         "name": "gift",
+        
+        // This is how long a player must wait before they can send another gift.
         "coolDownPeriod": 0,
+        
+        // This is the cost (money) for using this Perk.
         "perUseCost": 0.0,
+        
+        // The maximum number of gifts that a person can receive.
         "maximumNumber": 10
       }
     },
     {
-      "type": "com.netprogs.minecraft.plugins.social.config.settings.perk.TellSettings",
+      // This defines the settings for the "/social tell" Perk.
+      "type": "TellSettings",
       "data": {
+
+        // The name here can be anything you want but must match the same name below in the social group "perks" list.
         "name": "tell",
+        
+        // This is how long a player must wait before they can send another gift.
         "coolDownPeriod": 0,
+        
+        // This is the cost (money) for using this Perk.
         "perUseCost": 0.0
       }
     },
     {
-      "type": "com.netprogs.minecraft.plugins.social.config.settings.perk.StickySettings",
+      // This defines the settings for the "/social sticky" Perk.
+      "type": "StickySettings",
       "data": {
         "name": "sticky",
+        
+        // This is how long a player must wait before they can send another sticky.
         "coolDownPeriod": 0,
+        
+        // This is the cost (money) for using this Perk.
         "perUseCost": 0.0,
+
+        // The maximum number of stickies a player can have.
         "maximumNumber": 10
       }
     },
     {
-      "type": "com.netprogs.minecraft.plugins.social.config.settings.perk.TeleportSettings",
+      // This defines the settings for the teleportation Perk.
+      "type": "TeleportSettings",
       "data": {
+
+        // The name here can be anything you want but must match the same name below in the social group "perks" list.
         "name": "teleport",
+        
+        // This is how long a player must wait before they can send another gift.
         "coolDownPeriod": 0,
+        
+        // This is the cost (money) for using this Perk.
         "perUseCost": 0.0
       }
     },
     {
-      "type": "com.netprogs.minecraft.plugins.social.config.settings.perk.PlayerDamageSettings",
+      // This defines the settings for the damage prevention Perk.
+      "type": "PlayerDamageSettings",
       "data": {
-        "damageAllowedFromPlayer": false,
-        "damageAllowedFromProjectile": false,
-        "damageAllowedFromTameable": false,
+      
+        // The name here can be anything you want but must match the same name below in the social group "perks" list.
         "name": "damage",
+
+        // If you want to allow damage from another Player
+        "damageAllowedFromPlayer": false,
+        
+        // If you want to allow damage coming from a projectile.
+        "damageAllowedFromProjectile": false,
+        
+        // If you want to allow damage coming from a Tamed creature.
+        "damageAllowedFromTameable": false,
+
+        // This is how long a player must wait before they can send another gift.
         "coolDownPeriod": 60
       }
     },
     {
-      "type": "com.netprogs.minecraft.plugins.social.config.settings.perk.WorldGuardSettings",
+      // This defines the settings for the bonus experience Perk.
+      "type": "BonusExperienceSettings",
       "data": {
+        
+        // The name here can be anything you want but must match the same name below in the social group "perks" list.
+        "name": "bonusxp",
+
+        // The distance, in blocks, that the players must be near each other in order to gain this bonus.        
+        "proximity": 20,
+        
+        // The direct bonus experience to add to the amount normally gained from the kill.
+        // Setting to 0 as default to turn off the bonus. This can be any number you want, can also be negative !
+        "flatBonus": 0,
+        
+        // The percentage bonus to add to the amount normally gained from the kill.
+        // This is applied before the flat bonus above. Setting to 0 as default to turn off the bonus.
+        "percentBonus": 0
+      }
+    },
+    {
+      // This defines the settings for the health regen Perk.
+      "type": "HealthRegenSettings",
+      "data": {
+        
+        // The name here can be anything you want but must match the same name below in the social group "perks" list.
+        "name": "fastHealthRegen",
+
+        // The distance, in blocks, that the players must be near each other in order to gain this bonus.        
+        "proximity": 20,
+        
+        // This is the number of hearts to gain per server "tick". Each number represents a half heart increment.
+        // This can be a negative number also to create a "no regen" or "negative regen" effect for wanted cases.
+        // If a negative is given, we do not allow it to reduce them below 1 heart to avoid death.
+        "heartsPerkTick": 1
+      }
+    },
+    {
+      // This defines the settings for the food sharing Perk.
+      "type": "FoodShareSettings",
+      "data": {
+        
+        // The name here can be anything you want but must match the same name below in the social group "perks" list.
+        "name": "foodShare",
+
+        // The distance, in blocks, that the players must be near each other in order to gain this bonus.        
+        "proximity": 20
+      }
+    },
+    {
+      // This defines the settings for WorldGuard integration Perk.
+      // WorldGuard integration allows us to add social group members to your existing regions upon adding them to your lists.
+      // When you remove them from your social group lists, they also lose access to your regions.
+      "type": "WorldGuardSettings",
+      "data": {
+
+        // The name here can be anything you want but must match the same name below in the social group "perks" list.
         "name": "worldguard"
       }
     },
     {
-      "type": "com.netprogs.minecraft.plugins.social.config.settings.perk.LWCSettings",
+      // This defines the settings for LWC chest protection Perk.
+      // The LWC integration allows us to add social group members to your existing LWC access lists.
+      // When you remove them from your social group lists, they also lose access.
+      "type": "LWCSettings",
       "data": {
+
+        // The name here can be anything you want but must match the same name below in the social group "perks" list.
         "name": "lwc"
       }
     }
-  ]
+  ],
+
+  //
+  // This section is where we define the settings for each social group.
+  //
+  "groupSettings": {
+  
+    // This defines the settings for children.
+    "childSettings": {
+
+      // The maximum number of children a single player can have.
+      "maximumChildren": 30,
+
+      // The cost charged to a player when requesting someone to be part of this group.
+      "perUseCost": 0.0,
+
+      //     
+      // This is the list of Perks provided to the player and their children.
+      //
+      // If you do not want the players in this group to have a particular Perk, remove it from the list. 
+      // It will not be available to them unless that player belongs to another group that has the same Perk assigned to it.
+      //
+      "perks": [
+        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc", "bonusxp", "fastHealthRegen", "foodShare"
+      ]
+    },
+    // This defines the settings for friends.
+    "friendSettings": {
+    
+      // The maximum number of children a single player can have.
+      "maximumFriends": 30,
+
+      // The cost charged to a player when requesting someone to be part of this group.
+      "perUseCost": 0.0,
+
+      // This is the list of Perks provided to players and their friends.
+      "perks": [
+        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc", "bonusxp", "fastHealthRegen", "foodShare"
+      ]
+    },
+    // This defines the settings for relationships.
+    "relationshipSettings": {
+    
+      // The maximum number of relationships a single player can have.
+      "maximumRelationships": 30,
+
+      // The cost charged to a player when requesting someone to be part of this group.
+      "perUseCost": 0.0,
+
+      // This is the list of Perks provided to players and those they are in relationships with.
+      "perks": [
+        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc", "bonusxp", "fastHealthRegen", "foodShare"
+      ]
+    },
+    // This defines the settings for affairs.
+    "affairSettings": {
+    
+      // The maximum number of affairs a single player can have.
+      "maximumAffairs": 30,
+
+      // The cost charged to a player when requesting someone to be part of this group.
+      "perUseCost": 0.0,
+
+      // This is the list of Perks provided to players and those they are in an affair with.
+      "perks": [
+        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc", "bonusxp", "fastHealthRegen", "foodShare"
+      ]
+    },
+    // This defines the settings for engagements.
+    "engagementSettings": {
+    
+      // The period of time (in seconds) that needs to pass before an engagement can be turned into a Marriage.
+      "engagementPeriod": 300,
+
+      // The cost charged to a player when requesting someone to be part of this group.
+      "perUseCost": 50.0,
+
+      // This is the list of Perks provided to the player and their partner.
+      "perks": [
+        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc", "bonusxp", "fastHealthRegen", "foodShare"
+      ]
+    },
+    // This defines the settings for divorces.
+    "divorceSettings": {
+    
+      // The period of time (in seconds) that needs to pass before a player gets over their divorce and want to be 
+      // in a relationship or engagement again.
+      "bitternessPeriod": 300,
+
+      // The cost charged to a player when requesting someone to be part of this group.
+      "perUseCost": 50.0,
+
+      // This is the list of Perks provided to the player and their ex-partner.
+      "perks": [
+        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc", "bonusxp", "fastHealthRegen", "foodShare"
+      ]
+    },
+    // This defines the settings for marriages.
+    "marriageSettings": {
+    
+      // The period of time (in seconds) that needs to pass before a Marriage can be turned into a divorce.
+      "honeymoonPeriod": 300,
+
+      // The cost charged to a player when requesting someone to be part of this group.
+      "perUseCost": 0.0,
+
+      // This is the list of Perks provided to the player and their partner.
+      "perks": [
+        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc", "bonusxp", "fastHealthRegen", "foodShare"
+      ]
+    },
+    // This defines the settings for lawyers.
+    "lawyerSettings": {
+
+      // The period of time (in seconds) that needs to pass before a player gets over their divorce and want to be 
+      // in a relationship or engagement again.
+      "bitternessPeriod": 0,
+
+      // The cost charged to both players when a lawyer is used to divorce them.
+      "perUseCost": 500.0,
+
+      // This is the list of Perks provided to you if you are assigned to the lawyers list through /social admin. 
+      "perks": [
+        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc", "bonusxp", "fastHealthRegen", "foodShare"
+      ]
+    },
+    // This defines the settings for priests.
+    "priestSettings": {
+
+      // The period of time (in seconds) that needs to pass before a Marriage can be turned into a divorce.
+      "honeymoonPeriod": 0,
+
+      // The cost charged to both players when a priest is used to marry them.
+      "perUseCost": 500.0,
+
+      // This is the list of Perks provided to you if you are assigned to the priests list through /social admin. 
+      "perks": [
+        "gift", "tell", "sticky", "teleport", "damage", "worldguard", "lwc", "bonusxp", "fastHealthRegen", "foodShare"
+      ]
+    }
+  },
+
+  // If you want to do custom mapping of our commands to something better fitting to your needs, use this map to do so.  
+  "commandMapSettings": {
+
+    // By default this is disabled. You must set this to true if you want to use custom commands.
+    // If by chance you are having problems with the commands and can't get it to work, you can disable it again.
+    "enabled": false,
+
+    //
+    // This is the list of commands you wish to override.
+    //
+    // - The previous commands will still be available.
+    // - The help pages will display your custom commands.
+    //
+    // The values below are the command parameters that follow the plug-in base command /social, /s and /soc.
+    //
+    // The first value is the command you wish to use. MUST BE LOWER CASE.
+    // The second value is the actual command to use.  MUST BE LOWER CASE.
+    //
+    // BE CAREFUL NOT TO USE THE SAME CUSTOM NAME TWICE
+    //
+    "commandMap": {
+
+      // Example 1: We want to convert "/social friend request" into "/social fradd".
+      "fradd": "friend request",
+
+      // Example 2: Convert "/social friend accept" into "/social fraccept" removing the need for the second parameter.
+      "fraccept": "friend accept"
+    }
+  }
 }

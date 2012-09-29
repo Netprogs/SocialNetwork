@@ -1,15 +1,21 @@
 {
   "messages": {
 
-    // These are used during the /social join command
-    "social.join.genderRequired.label.sender": "Please choose the gender of your character.",
-    "social.join.genderRequired.commands.sender": "Use &e/social join <male | female>&a to choose.",
+    // Join / Quit Messages
     "social.join.completed.sender": "Welcome to the Social Network !",
-    "social.join.help": "Join the social network.",
+    "social.join.help": "Join the Social Network.",
+    "social.rejoin.completed.sender": "Welcome back to the Social Network !",
+    "social.rejoin.help": "Re-join the Social Network after quitting.",
+    "social.quit.completed.sender": "You have left the Social Network.",
+    "social.quit.help": "Quits the Social Network.",
 
-    // These are used during the /social quit command
-    "social.quit.completed.sender": "You have left the Social Network !",
-    "social.quit.help": "Quits the social network.",
+    // These are used during the /social gender command
+    "social.gender.choose.initial.sender": "Please choose the gender of your character.",
+    "social.gender.choose.reminder.sender": "This is a reminder for you to choose a gender !",
+    "social.gender.choose.commands.sender": "Use &e/social gender <male | female>&a to choose.",
+    "social.gender.choose.completed.sender": "Gender chosen. Welcome to the Social Network !",
+    "social.gender.alreadyChosen.sender": "Gender has already been chosen.",
+    "social.gender.help": "Choose your gender.",
     
     // Ignore command
     "social.ignore.add.completed.sender": "<player> is now ignored.",
@@ -34,13 +40,17 @@
     "social.requests.tag.child.sender": "[Child]",
     "social.requests.tag.divorce.sender": "[Divorce]",
     "social.requests.noneAvailable.sender": "You currently have no requests pending.",
+    "social.requests.wrongPage": "That page does not exist.",
     "social.requests.help": "Returns list of current pending requests.",
 
     // This is the list of messages used when using /social alerts to see what you have available
     "social.alerts.header.sender": "[Social Network Alerts]",
-    "social.alerts.tag.quit.sender": "[Quit]",
+    "social.alerts.tag.deleted.sender": "[Deleted]",
     "social.alerts.noneAvailable.sender": "You currently have no alerts.",
     "social.alerts.help": "Returns list of current alerts.",
+        
+    // Alert messages
+    "social.alert.playerDeleted": "<player> has been removed from the network and is no longer in any of your groups.",
     
     // This is the list of messages used when using /social requests to see what you have available
     "social.online.header.sender": "[Social Network Online]",
@@ -54,6 +64,46 @@
     "social.online.tag.divorce.sender": "[Divorced]",
     "social.online.noneAvailable.sender": "There is currently nobody online within your network.",
     "social.online.help": "Displays all your contacts.",
+
+    // This is the list of messages used when requesting the last login date for a player
+    "social.lastlogin.completed": "<player> was last on <date>.",
+    "social.lastlogin.help": "Displays last login date of player.",
+
+    // This is the list of messages used when updating your status message
+    "social.statusmessage.completed": "Your status message has been saved.",
+    "social.statusmessage.help": "Update your status message.",
+
+    // This is the list of messages used when updating your status message
+    "social.pausechat.enabled": "Your chat is now enabled.",
+    "social.pausechat.disabled": "Your chat is now disabled.",
+    "social.pausechat.help": "Disable all chat. Toggle on/off.",
+
+    // This is the list of messages used when displaying a player profile
+    "social.profile.header": "[Profile]",
+    "social.profile.label.name": "Name: <player>",
+    "social.profile.label.gender": "Gender: <gender>",
+    "social.profile.label.joindate": "Joined: <date>",
+    "social.profile.label.lastlogin": "Last Logged In: <date>",
+    "social.profile.label.group.friend": "<count> friends",
+    "social.profile.label.group.relationship": "<count> relationships",
+    "social.profile.label.group.affair": "<count> affairs",
+    "social.profile.label.group.child": "<count> children",
+    "social.profile.label.group.childOf": "Child of:  <player>",
+    "social.profile.label.group.engagement": "Engaged to:  <player>",
+    "social.profile.label.group.marriage": "Married to:  <player>",
+    "social.profile.label.group.divorce": "Divorced from:  <player>",
+    "social.profile.label.status": "Status: <message>",
+    "social.profile.help": "Display the players profile.",
+
+    "social.mute.login.on.sender": "You will no longer receive login notifications.",
+    "social.mute.login.off.sender": "You will now receive login notifications.",
+    "social.mute.login.help.toggle": "Toggle the display of logins.",
+    "social.mute.status.on.sender": "You will no longer receive status change notifications.",
+    "social.mute.status.off.sender": "You will now receive status change notifications.",
+    "social.mute.status.help.toggle": "Toggle the display of status updates.",
+    "social.mute.gender.on.sender": "You will no longer receive gender reminders.",
+    "social.mute.gender.off.sender": "You will now receive gender reminders.",
+    "social.mute.gender.help.toggle": "Toggle the display of gender reminders.",
 
     // These are used during the /social friend command
     "social.friend.request.completed.sender": "You have sent a friend request to <player>.",
@@ -78,13 +128,16 @@
     "social.friend.help.accept": "Accepts a request.",
     "social.friend.help.reject": "Rejects a request.",
     "social.friend.help.ignore": "Silently rejects a request.",
-    "social.friend.help.remove": "Removes player from your list.",
+    "social.friend.help.acceptall": "Accepts all requests.",
+    "social.friend.help.rejectall": "Accepts all requests.",
+    "social.friend.help.ignoreall": "Accepts all requests.",
+    "social.friend.help.remove": "Removes player from group.",
     "social.friend.help.list": "Displays all your friends.",
     
     // These are used during the /social child command
     // A child request comes from the child to the parent. The parent then chooses to accept it or not.
-    "social.child.request.completed.sender": "You have sent a child request to <player>.",
-    "social.child.request.completed.player": "<player> has sent you a child request.",
+    "social.child.request.completed.sender": "You have requested <player> to be your child.",
+    "social.child.request.completed.player": "<player> has sent you a request to be their child.",
     "social.child.request.alreadyInGroup.sender": "<player> is already a child of yourself or someone else.",
     "social.child.request.alreadyRequested.sender": "You already sent <player> a child request.",
     "social.child.accept.completed.sender": "You have accepted <player> as a parent.",
@@ -93,21 +146,25 @@
     "social.child.reject.completed.sender": "You have rejected <player> as a parent.",
     "social.child.reject.completed.player": "<player> has rejected your child request.",
     "social.child.ignore.completed.sender": "You have silently rejected <player> as a parent.",
-    "social.child.remove.completed.sender": "You have removed <player> as a child.",
+    "social.child.remove.completed.sender": "You are no longer related to <player>.",
     "social.child.list.header.sender": "[Child List]",
     "social.child.list.noPeople.sender": "You currently have nobody in your child list.",
     "social.child.notInGroup.sender": "<player> is not a child of yours.",
     "social.child.cannotSendRequest.sender": "This player is already a child of someone else.",
+    "social.child.cannotSendRequest.married.sender": "You are Married to this player and cannot add them as a child.",
     "social.child.cannotSendRequest.price.sender": "You cannot afford to request a child.",
     "social.child.cannotSendRequest.maximum.sender": "Sorry, limit reached. You cannot add anymore children.",
     "social.child.cannotAcceptRequest.sender": "You are already a child of someone else.",
     "social.child.cannotAcceptRequest.price.sender": "You cannot afford to accept a child.",
     "social.child.cannotAcceptRequest.maximum.sender": "Sorry, limit reached. You cannot accept anymore children.",
-    "social.child.help.request": "Send a child request.",
+    "social.child.help.request": "Request player to be your child.",
     "social.child.help.accept": "Accepts a request.",
     "social.child.help.reject": "Rejects a request.",
     "social.child.help.ignore": "Silently rejects a request.",
-    "social.child.help.remove": "Removes player from your list.",
+    "social.child.help.acceptall": "Accepts all requests.",
+    "social.child.help.rejectall": "Accepts all requests.",
+    "social.child.help.ignoreall": "Accepts all requests.",
+    "social.child.help.remove": "Removes player as a child.",
     "social.child.help.list": "Displays all your children.",
     
     // These are used during the /social relationship command
@@ -135,8 +192,43 @@
     "social.relationship.help.accept": "Accepts a request.",
     "social.relationship.help.reject": "Rejects a request.",
     "social.relationship.help.ignore": "Silently rejects a request.",
-    "social.relationship.help.remove": "Removes player from your list.",
+    "social.relationship.help.acceptall": "Accepts all requests.",
+    "social.relationship.help.rejectall": "Accepts all requests.",
+    "social.relationship.help.ignoreall": "Accepts all requests.",
+    "social.relationship.help.remove": "Removes player from group.",
     "social.relationship.help.list": "Displays all your relationships.",
+    
+    // These are used during the /social affair command
+    "social.affair.request.completed.sender": "You have sent an affair request to <player>.",
+    "social.affair.request.completed.player": "<player> has sent you an affair request.",
+    "social.affair.request.alreadyInGroup.sender": "<player> is already in an affair with you.",
+    "social.affair.request.alreadyRequested.sender": "You already sent <player> an affair request.",
+    "social.affair.accept.completed.sender": "You have accepted an affair with <player>.",
+    "social.affair.accept.completed.player": "<player> has accepted your affair request.",
+    "social.affair.accept.playerNoRequest": "<player> did not send you an affair request.",
+    "social.affair.acceptall.completed.sender": "You have accepted all affair requests.",
+    "social.affair.reject.completed.sender": "You have rejected an affair with <player>.",
+    "social.affair.reject.completed.player": "<player> has rejected your affair request.",
+    "social.affair.ignore.completed.sender": "You have silently rejected an affair with <player>.",
+    "social.affair.remove.completed.sender": "You have broken your affair with <player>.",
+    "social.affair.list.header.sender": "[Affairs List]",
+    "social.affair.list.noPeople.sender": "You currently have nobody in your affairs list.",
+    "social.affair.notInGroup.sender": "You are not having an affair with <player>.",
+    "social.affair.cannotSendRequest.sender": "You are only allowed to request an affair while married or engaged.",
+    "social.affair.cannotSendRequest.price.sender": "You cannot afford to request an affair.",
+    "social.affair.cannotSendRequest.maximum.sender": "Sorry, limit reached. You cannot add anymore affairs.",
+    "social.affair.cannotAcceptRequest.sender": "You are only allowed to accept an affair while married or engaged.",
+    "social.affair.cannotAcceptRequest.price.sender": "You cannot afford to accept an affair.",
+    "social.affair.cannotAcceptRequest.maximum.sender": "Sorry, limit reached. You cannot accept anymore affairs.",
+    "social.affair.help.request": "Send a affair request.",
+    "social.affair.help.accept": "Accepts a request.",
+    "social.affair.help.reject": "Rejects a request.",
+    "social.affair.help.ignore": "Silently rejects a request.",
+    "social.affair.help.acceptall": "Accepts all requests.",
+    "social.affair.help.rejectall": "Accepts all requests.",
+    "social.affair.help.ignoreall": "Accepts all requests.",
+    "social.affair.help.remove": "Removes player from group.",
+    "social.affair.help.list": "Displays all your affairs.",
     
     // These are used during the /social marriage command
     "social.marriage.request.completed.sender": "You have sent a marriage request to <player>.",
@@ -194,6 +286,7 @@
     "social.engagement.remove.completed.sender": "You have broken your engagement with <player>.",
     "social.engagement.notInGroup.sender": "You are not engaged to <player>.",
     "social.engagement.cannotSendRequest.sender": "You cannot get engaged while married or already engaged.",
+    "social.engagement.cannotSendRequest.childParent.sender": "You cannot get engaged to your child or parent.",
     "social.engagement.cannotSendRequest.ontimer.sender": "You cannot get married for another <hours>:<minutes>:<seconds>.",
     "social.engagement.cannotSendRequest.price.sender": "You cannot afford to request an engagement.",
     "social.engagement.cannotAcceptRequest.sender": "You cannot get engaged while married or already engaged.",
@@ -204,37 +297,10 @@
     "social.engagement.help.ignore": "Silently rejects a request.",
     "social.engagement.help.remove": "Removes player from your list.",
 
-    // These are used during the /social affair command
-    "social.affair.request.completed.sender": "You have sent an affair request to <player>.",
-    "social.affair.request.completed.player": "<player> has sent you an affair request.",
-    "social.affair.request.alreadyInGroup.sender": "<player> is already in an affair with you.",
-    "social.affair.request.alreadyRequested.sender": "You already sent <player> an affair request.",
-    "social.affair.accept.completed.sender": "You have accepted an affair with <player>.",
-    "social.affair.accept.completed.player": "<player> has accepted your affair request.",
-    "social.affair.accept.playerNoRequest": "<player> did not send you an affair request.",
-    "social.affair.reject.completed.sender": "You have rejected an affair with <player>.",
-    "social.affair.reject.completed.player": "<player> has rejected your affair request.",
-    "social.affair.ignore.completed.sender": "You have silently rejected an affair with <player>.",
-    "social.affair.remove.completed.sender": "You have broken your affair with <player>.",
-    "social.affair.list.header.sender": "[Affairs List]",
-    "social.affair.list.noPeople.sender": "You currently have nobody in your affairs list.",
-    "social.affair.notInGroup.sender": "You are not having an affair with <player>.",
-    "social.affair.cannotSendRequest.sender": "You are only allowed to request an affair while married or engaged.",
-    "social.affair.cannotSendRequest.price.sender": "You cannot afford to request an affair.",
-    "social.affair.cannotSendRequest.maximum.sender": "Sorry, limit reached. You cannot add anymore affairs.",
-    "social.affair.cannotAcceptRequest.sender": "You are only allowed to accept an affair while married or engaged.",
-    "social.affair.cannotAcceptRequest.price.sender": "You cannot afford to accept an affair.",
-    "social.affair.cannotAcceptRequest.maximum.sender": "Sorry, limit reached. You cannot accept anymore affairs.",
-    "social.affair.help.request": "Send a affair request.",
-    "social.affair.help.accept": "Accepts a request.",
-    "social.affair.help.reject": "Rejects a request.",
-    "social.affair.help.ignore": "Silently rejects a request.",
-    "social.affair.help.remove": "Removes player from your list.",
-    "social.affair.help.list": "Displays all your affairs.",
-
     // These are used during the /social priest command
     "social.priest.request.question.player": "<priest> wishes to marry you with <player>.",
     "social.priest.request.commands.player": "Do you accept ? Use &e/social priest <accept | reject>&a.",
+    "social.priest.request.waiting.sender": "Marriage request has been sent to <player>. Waiting for response.",
     "social.priest.request.coupleNotEngaged.sender": "The couple are not engaged to each other.",
     "social.priest.request.coupleOnTimer.sender": "The couple are not allowed to marry for another <hours>:<minutes>:<seconds>.",
     "social.priest.request.coupleCannotAfford.sender": "The couple cannot afford the cost of the marriage.",
@@ -244,7 +310,7 @@
     "social.priest.reject.sender": "You have rejected your vows. The wedding is over !",
     "social.priest.completed.global": "Congratulations to <playerA> and <playerB> on their Marriage !",
     "social.priest.list.noPeople.sender": "There are currently no priests available.",
-    "social.priest.help.request": "Sends out the marriage request.",
+    "social.priest.help.request": "Send marriage request.",
     "social.priest.help.list": "List available priests.",
     "social.priest.help.accept": "Accepts the marriage request.",
     "social.priest.help.reject": "Rejects the marriage request.",
@@ -256,7 +322,7 @@
     "social.lawyer.completed.player": "You are no longer married to <player>.",
     "social.lawyer.completed.sender": "<playerA> and <playerB> have been divorced.",
     "social.lawyer.list.noPeople.sender": "There are currently no lawyers available.",
-    "social.lawyer.help.request": "Sends out the divorce request.",
+    "social.lawyer.help.request": "Send divorce request.",
     "social.lawyer.help.list": "List available lawyers.",
     "social.lawyer.help.accept": "Accepts the divorce request.",
     "social.lawyer.help.reject": "Rejects the divorce request.",
@@ -296,20 +362,25 @@
     "social.perk.gift.send.cancelled.sender": "Your gift has not been sent.",
     "social.perk.gift.none.sender": "No gifts available.",
     "social.perk.gift.list.header.sender": "Your current gifts",
-    "social.perk.gift.list.item.sender": "<number> gift(s) from <player>",
+    "social.perk.gift.list.item.sender": "<number> gift(s) from <player>.",
     "social.perk.gift.read.header.sender": "Gifts",
-    "social.perk.gift.read.item.sender": "<player> sent you <gift>";
+    "social.perk.gift.read.item.sender": "[<world>] <player> sent you <gift>.";
+    "social.perk.gift.open.item.sender": "You received <gift> from <player>.";
     "social.perk.gift.help.send.cash": "Send cash to player.",
     "social.perk.gift.help.send.item": "Send in-hand item to player.",
     "social.perk.gift.help.list": "Lists gifts by player.",
+    "social.perk.gift.help.read": "Displays all gifts from player.",
     "social.perk.gift.help.open": "Opens and deletes all gifts from player.",
     "social.perk.gift.verifyRequired.label.sender": "Do you wish to send <player> <item> ?",
     "social.perk.gift.verifyRequired.commands.sender": "Use &e/social gift <yes | no>&a to choose.",
     "social.perk.gift.notEnoughFunds": "You do not have <price> to send.",
     "social.perk.gift.limitReached": "You cannot send <player> anymore gifts.",
+    "social.perk.gift.multiWorld.noneAvailable": "There are no gifts available to you in this world.",
+    "social.perk.gift.multiWorld.notice": "NOTICE: You must be in the same world as the gift to receive it.",
 
     // Listener Perks
     "social.perk.damage.ontimer.sender": "You cannot damage <player> for another <hours>:<minutes>:<seconds>.",
+    "social.perk.bonusxp.gained.player": "You gained <bonus> bonus xp for a total of <total>.",
 
     // These are used during wait commands
     "social.wait.waitingForResponse.sender": "We are waiting for you to respond to the following request:",
@@ -322,9 +393,16 @@
     "social.message.stickies": "stickie(s)",
     "social.message.gifts": "gift(s)",
     
+    // Group Notification Messages
+    "social.group.login": "<player> has logged in.",
+    "social.group.logout": "<player> has logged out.",
+    "social.group.status": "<player> has updated their status: <status>",
+    
     // General Messages
     "social.list.tag.online.sender": "[Online]",
     "social.list.tag.offline.sender": "[Offline]",
+    "social.label.male": "Male",
+    "social.label.tag.female": "Female",
 
     // Help General Messages
     "social.help": "Displays a help page.",
@@ -332,7 +410,8 @@
     "social.help.footer": "[ Aliases /s, /soc, /social ]",
     "social.help.noneAvailable": "You do not have any available commands to you for this plug-in.",
     "social.help.wrongPage": "That page does not exist.",
-    "social.help.perks.title": "** Available Perks **.",
+    "social.help.perks.title": "** Available Perks **",
+    "social.help.admin.title": "Admin Commands",
 
     // Administration
     "social.admin.priest.add.completed.sender": "You have made <player> a priest.",
@@ -347,14 +426,22 @@
     "social.admin.lawyer.list.none.sender": "There are currently no lawyers.",
     "social.admin.lawyer.help.toggle": "Toggle lawyer status for player.",
     "social.admin.lawyer.help.list": "Lists current lawyers.",
+    "social.admin.purge.completed.sender": "Purged <count> accounts.",
+    "social.admin.purge.help": "Purge inactive accounts.",
+    "social.admin.clear.completed.sender": "Player timers have been reset.",
+    "social.admin.clear.help": "Clears command timers for player.",
+    "social.admin.reload.completed.sender": "Configuration reload completed.",
+    "social.admin.reload.help": "Reload configuration files.",
+    "social.admin.remove.completed.sender": "Player has been deleted.",
+    "social.admin.remove.help": "Delete a player data files.",
+    "social.admin.gender.completed.sender": "Player gender updated.",
+    "social.admin.gender.invalid.sender": "Invalid gender.",
+    "social.admin.gender.help": "Change players gender.",
 
     // General command errors
-    "social.error.sameGenderDisabled.sender": "Same sex marriages are disabled.",
+    "social.error.sameGenderDisabled.sender": "Same gender marriages are disabled.",
     "social.error.cannotSendSelf.sender": "You cannot send yourself requests.",
     "social.error.alreadyJoined.sender": "It seems you have already joined the network.",
-    
-    // System alerts
-    "social.alert.playerLeftNetwork": "Player left the network and is no longer in any of your groups.",
 
     // Player/Person lookup errors
     "social.error.offlinePlayer": "<player> appears to be offline. Try again later.",
@@ -370,6 +457,7 @@
     "social.error.invalidPerk": "Sorry, you do not currently have access to this Perk.",
     "social.error.commandOnCooldown": "You must wait another <hours>:<minutes>:<seconds> to run this command.",
     "social.error.notEnoughFunds": "You must have <price> available to run this command.",
-    "social.error.unknownArguments": "Unknown arguments. Use /s help if needed."
+    "social.error.unknownArguments": "Unknown arguments. Help page for command below.",
+    "social.error.unknownCommand": "Unknown command. Please use /social help."
   }
 }

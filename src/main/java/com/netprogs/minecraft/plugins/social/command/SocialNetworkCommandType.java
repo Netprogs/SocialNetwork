@@ -23,8 +23,8 @@ package com.netprogs.minecraft.plugins.social.command;
 import com.netprogs.minecraft.plugins.social.command.ISocialNetworkCommand.ICommandType;
 
 public enum SocialNetworkCommandType implements ICommandType {
-    admin, help, join, quit, requests, alerts, online, ignore, friend, child, relationship, affair, engagement,
-    marriage, divorce, priest, lawyer, teleport, sticky, tell, gift;
+    admin, help, join, quit, gender, requests, alerts, online, lastlogin, ignore, status, pausechat, profile, mute,
+    friend, child, relationship, affair, engagement, marriage, divorce, priest, lawyer, teleport, sticky, tell, gift;
 
     public static boolean contains(String type) {
         SocialNetworkCommandType[] values = SocialNetworkCommandType.values();

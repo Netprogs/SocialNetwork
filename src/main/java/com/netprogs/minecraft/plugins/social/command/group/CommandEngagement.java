@@ -1,22 +1,20 @@
 package com.netprogs.minecraft.plugins.social.command.group;
 
 import java.util.List;
-import java.util.logging.Logger;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.SocialPerson.Status;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommandType;
 import com.netprogs.minecraft.plugins.social.command.exception.ArgumentsMissingException;
 import com.netprogs.minecraft.plugins.social.command.exception.InvalidPermissionsException;
 import com.netprogs.minecraft.plugins.social.command.exception.PlayerNotInNetworkException;
+import com.netprogs.minecraft.plugins.social.command.help.HelpBook;
 import com.netprogs.minecraft.plugins.social.command.help.HelpMessage;
 import com.netprogs.minecraft.plugins.social.command.help.HelpSegment;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.command.util.TimerUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.group.EngagementSettings;
-import com.netprogs.minecraft.plugins.social.integration.VaultIntegration;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -44,8 +42,6 @@ import org.bukkit.entity.Player;
 
 public class CommandEngagement extends GroupCommand<EngagementSettings> {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
     public CommandEngagement() {
         super(SocialNetworkCommandType.engagement);
     }
@@ -66,6 +62,21 @@ public class CommandEngagement extends GroupCommand<EngagementSettings> {
         }
 
         boolean success = true;
+
+        // Check to see if they allow same gender Marriage, which means the engagement won't be allowed
+        if (!SocialNetworkPlugin.getSettings().isSameGenderMarriageAllowed()) {
+            if (playerPerson.getGender() == receiverPerson.getGender()) {
+                MessageUtil.sendMessage(playerPerson, "social.error.sameGenderDisabled.sender", ChatColor.RED);
+                return false;
+            }
+        }
+
+        // check to see if they're a child or parent of the person they're asking to marry
+        if (playerPerson.isChildOf(receiverPerson) || playerPerson.isParentOf(receiverPerson)) {
+            MessageUtil.sendMessage(playerPerson, "social." + getCommandType()
+                    + ".cannotSendRequest.childParent.sender", ChatColor.GOLD);
+            return false;
+        }
 
         // Divorced couples remain on a "bitterness" phase for a period of time.
         // During this time they're not allowed to get engaged again. Check for that now.
@@ -148,13 +159,7 @@ public class CommandEngagement extends GroupCommand<EngagementSettings> {
     @Override
     protected boolean personInGroup(SocialPerson playerPerson, SocialPerson inGroupPerson) {
 
-        // if the engagement object is valid and it's player is the same as the groupPerson given, then we have a match
-        if (playerPerson.getEngagement() != null
-                && playerPerson.getEngagement().getPlayerName().equalsIgnoreCase(inGroupPerson.getName())) {
-            return true;
-        }
-
-        return false;
+        return playerPerson.isEngagedTo(inGroupPerson);
     }
 
     /**
@@ -166,7 +171,7 @@ public class CommandEngagement extends GroupCommand<EngagementSettings> {
     protected void addPersonToGroup(SocialPerson playerPerson, SocialPerson addPerson) {
 
         // create and set the engagement to the playerPerson
-        playerPerson.createEngagement(addPerson.getName());
+        playerPerson.createEngagement(addPerson);
 
         // change their status
         playerPerson.setSocialStatus(Status.engaged);
@@ -179,12 +184,13 @@ public class CommandEngagement extends GroupCommand<EngagementSettings> {
         EngagementSettings settings = getCommandSettings();
         Player player = Bukkit.getServer().getPlayer(playerPerson.getName());
         if (player != null) {
-            VaultIntegration.getInstance().processCommandPurchase(player, settings.getPerUseCost());
+            SocialNetworkPlugin.getVault().processCommandPurchase(player, settings.getPerUseCost());
         }
 
         // update the timer for the command
         int timer = settings.getEngagementPeriod();
-        TimerUtil.updateCommandTimer(playerPerson.getName(), SocialNetworkCommandType.engagement, timer);
+        SocialNetworkPlugin.getTimerManager().updateCommandTimer(playerPerson.getName(),
+                SocialNetworkCommandType.engagement, timer);
     }
 
     /**
@@ -248,40 +254,60 @@ public class CommandEngagement extends GroupCommand<EngagementSettings> {
         // Engagement doesn't support list
     }
 
+    /**
+     * Provides the chance to display a help page to player who have been sent a request.
+     * @param receiver The player to receive the help message.
+     */
+    @Override
+    protected void displayRequestHelp(Player receiver) {
+
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
+
+        HelpMessage acceptCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "accept", "<player>",
+                        config.getResource("social.engagement.help.accept"));
+        MessageUtil.sendMessage(receiver, acceptCommand.display());
+
+        HelpMessage rejectCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "reject", "<player>",
+                        config.getResource("social.engagement.help.reject"));
+        MessageUtil.sendMessage(receiver, rejectCommand.display());
+
+        HelpMessage ignoreCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "ignore", "<player>",
+                        config.getResource("social.engagement.help.ignore"));
+        MessageUtil.sendMessage(receiver, ignoreCommand.display());
+    }
+
     @Override
     public HelpSegment help() {
 
         HelpSegment helpSegment = new HelpSegment(getCommandType());
-        ResourcesConfig config = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
 
-        HelpMessage mainCommand = new HelpMessage();
-        mainCommand.setCommand(getCommandType().toString());
-        mainCommand.setArguments("request <player>");
-        mainCommand.setDescription(config.getResource("social.engagement.help.request"));
+        HelpMessage mainCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "request", "<player>",
+                        config.getResource("social.engagement.help.request"));
         helpSegment.addEntry(mainCommand);
 
-        HelpMessage acceptCommand = new HelpMessage();
-        acceptCommand.setCommand(getCommandType().toString());
-        acceptCommand.setArguments("accept <player>");
-        acceptCommand.setDescription(config.getResource("social.engagement.help.accept"));
+        HelpMessage acceptCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "accept", "<player>",
+                        config.getResource("social.engagement.help.accept"));
         helpSegment.addEntry(acceptCommand);
 
-        HelpMessage rejectCommand = new HelpMessage();
-        rejectCommand.setCommand(getCommandType().toString());
-        rejectCommand.setArguments("reject <player>");
-        rejectCommand.setDescription(config.getResource("social.engagement.help.reject"));
+        HelpMessage rejectCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "reject", "<player>",
+                        config.getResource("social.engagement.help.reject"));
         helpSegment.addEntry(rejectCommand);
 
-        HelpMessage ignoreCommand = new HelpMessage();
-        ignoreCommand.setCommand(getCommandType().toString());
-        ignoreCommand.setArguments("ignore <player>");
-        ignoreCommand.setDescription(config.getResource("social.engagement.help.ignore"));
+        HelpMessage ignoreCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "ignore", "<player>",
+                        config.getResource("social.engagement.help.ignore"));
         helpSegment.addEntry(ignoreCommand);
 
-        HelpMessage removeCommand = new HelpMessage();
-        removeCommand.setCommand(getCommandType().toString());
-        removeCommand.setArguments("remove <player>");
-        removeCommand.setDescription(config.getResource("social.engagement.help.remove"));
+        HelpMessage removeCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "remove", "<player>",
+                        config.getResource("social.engagement.help.remove"));
         helpSegment.addEntry(removeCommand);
 
         return helpSegment;

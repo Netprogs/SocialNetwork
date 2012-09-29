@@ -1,22 +1,20 @@
 package com.netprogs.minecraft.plugins.social.command.group;
 
 import java.util.List;
-import java.util.logging.Logger;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.SocialPerson.Status;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommandType;
 import com.netprogs.minecraft.plugins.social.command.exception.ArgumentsMissingException;
 import com.netprogs.minecraft.plugins.social.command.exception.InvalidPermissionsException;
 import com.netprogs.minecraft.plugins.social.command.exception.PlayerNotInNetworkException;
+import com.netprogs.minecraft.plugins.social.command.help.HelpBook;
 import com.netprogs.minecraft.plugins.social.command.help.HelpMessage;
 import com.netprogs.minecraft.plugins.social.command.help.HelpSegment;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.command.util.TimerUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.group.DivorceSettings;
-import com.netprogs.minecraft.plugins.social.integration.VaultIntegration;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -43,8 +41,6 @@ import org.bukkit.entity.Player;
  */
 
 public class CommandDivorce extends GroupCommand<DivorceSettings> {
-
-    private final Logger logger = Logger.getLogger("Minecraft");
 
     public CommandDivorce() {
         super(SocialNetworkCommandType.divorce);
@@ -150,13 +146,7 @@ public class CommandDivorce extends GroupCommand<DivorceSettings> {
     @Override
     protected boolean personInGroup(SocialPerson playerPerson, SocialPerson inGroupPerson) {
 
-        // if the divorce object is valid and it's player is the same as the groupPerson given, then we have a match
-        if (playerPerson.getDivorce() != null
-                && playerPerson.getDivorce().getPlayerName().equalsIgnoreCase(inGroupPerson.getName())) {
-            return true;
-        }
-
-        return false;
+        return playerPerson.isDivorcedFrom(inGroupPerson);
     }
 
     /**
@@ -168,7 +158,7 @@ public class CommandDivorce extends GroupCommand<DivorceSettings> {
     protected void addPersonToGroup(SocialPerson playerPerson, SocialPerson addPerson) {
 
         // create and set the divorce to the playerPerson
-        playerPerson.createDivorce(addPerson.getName());
+        playerPerson.createDivorce(addPerson);
 
         // remove their marriage
         playerPerson.breakMarriage();
@@ -184,13 +174,14 @@ public class CommandDivorce extends GroupCommand<DivorceSettings> {
         int timer = settings.getBitternessPeriod();
 
         // update the timer for the command
-        TimerUtil.updateCommandTimer(playerPerson.getName(), SocialNetworkCommandType.divorce, timer);
+        SocialNetworkPlugin.getTimerManager().updateCommandTimer(playerPerson.getName(),
+                SocialNetworkCommandType.divorce, timer);
 
         // Charge the player for the cost of the divorce.
         // Ignore if they can't afford it (we already checked earlier)
         Player player = Bukkit.getServer().getPlayer(playerPerson.getName());
         if (player != null) {
-            VaultIntegration.getInstance().processCommandPurchase(player, settings.getPerUseCost());
+            SocialNetworkPlugin.getVault().processCommandPurchase(player, settings.getPerUseCost());
         }
     }
 
@@ -235,28 +226,45 @@ public class CommandDivorce extends GroupCommand<DivorceSettings> {
         // Divorce doesn't support list
     }
 
+    /**
+     * Provides the chance to display a help page to player who have been sent a request.
+     * @param receiver The player to receive the help message.
+     */
+    @Override
+    protected void displayRequestHelp(Player receiver) {
+
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
+
+        HelpMessage acceptCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "accept", "<player>",
+                        config.getResource("social.divorce.help.accept"));
+        MessageUtil.sendMessage(receiver, acceptCommand.display());
+
+        HelpMessage rejectCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "reject", "<player>",
+                        config.getResource("social.divorce.help.reject"));
+        MessageUtil.sendMessage(receiver, rejectCommand.display());
+    }
+
     @Override
     public HelpSegment help() {
 
         HelpSegment helpSegment = new HelpSegment(getCommandType());
-        ResourcesConfig config = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
 
-        HelpMessage mainCommand = new HelpMessage();
-        mainCommand.setCommand(getCommandType().toString());
-        mainCommand.setArguments("request <player>");
-        mainCommand.setDescription(config.getResource("social.divorce.help.request"));
+        HelpMessage mainCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "request", "<player>",
+                        config.getResource("social.divorce.help.request"));
         helpSegment.addEntry(mainCommand);
 
-        HelpMessage acceptCommand = new HelpMessage();
-        acceptCommand.setCommand(getCommandType().toString());
-        acceptCommand.setArguments("accept <player>");
-        acceptCommand.setDescription(config.getResource("social.divorce.help.accept"));
+        HelpMessage acceptCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "accept", "<player>",
+                        config.getResource("social.divorce.help.accept"));
         helpSegment.addEntry(acceptCommand);
 
-        HelpMessage rejectCommand = new HelpMessage();
-        rejectCommand.setCommand(getCommandType().toString());
-        rejectCommand.setArguments("reject <player>");
-        rejectCommand.setDescription(config.getResource("social.divorce.help.reject"));
+        HelpMessage rejectCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "reject", "<player>",
+                        config.getResource("social.divorce.help.reject"));
         helpSegment.addEntry(rejectCommand);
 
         return helpSegment;

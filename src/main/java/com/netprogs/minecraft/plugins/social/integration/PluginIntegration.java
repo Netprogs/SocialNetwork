@@ -5,9 +5,6 @@ import org.bukkit.plugin.Plugin;
 /*
  * Copyright (C) 2012 Scott Milne
  * 
- * "Social Network" is a Craftbukkit Minecraft server modification plug-in. It attempts to add a 
- * social environment to your server by allowing players to be placed into different types of social groups.
- * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -24,7 +21,28 @@ import org.bukkit.plugin.Plugin;
 
 public abstract class PluginIntegration {
 
-    public abstract void initialize(Plugin plugin);
+    private Plugin plugin;
+    private boolean isLoggingDebug;
+
+    public PluginIntegration(Plugin plugin, boolean isLoggingDebug) {
+
+        this.plugin = plugin;
+        this.isLoggingDebug = isLoggingDebug;
+    }
+
+    protected Plugin getPlugin() {
+        return plugin;
+    }
+
+    protected boolean isLoggingDebug() {
+        return isLoggingDebug;
+    }
+
+    protected abstract boolean isPluginEnabled();
+
+    protected abstract boolean isPluginLoaded();
+
+    public abstract void initialize();
 
     public boolean isEnabled() {
 
@@ -39,8 +57,4 @@ public abstract class PluginIntegration {
         // the component was not installed
         return false;
     }
-
-    protected abstract boolean isPluginEnabled();
-
-    protected abstract boolean isPluginLoaded();
 }

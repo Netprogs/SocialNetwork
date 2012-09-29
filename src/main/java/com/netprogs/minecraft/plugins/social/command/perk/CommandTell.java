@@ -2,8 +2,8 @@ package com.netprogs.minecraft.plugins.social.command.perk;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommandType;
 import com.netprogs.minecraft.plugins.social.command.exception.ArgumentsMissingException;
@@ -12,14 +12,13 @@ import com.netprogs.minecraft.plugins.social.command.exception.PlayerNotInNetwor
 import com.netprogs.minecraft.plugins.social.command.exception.PlayerNotOnlineException;
 import com.netprogs.minecraft.plugins.social.command.exception.SenderNotInNetworkException;
 import com.netprogs.minecraft.plugins.social.command.exception.SenderNotPlayerException;
+import com.netprogs.minecraft.plugins.social.command.help.HelpBook;
 import com.netprogs.minecraft.plugins.social.command.help.HelpMessage;
 import com.netprogs.minecraft.plugins.social.command.help.HelpSegment;
 import com.netprogs.minecraft.plugins.social.command.util.MessageParameter;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.perk.TellSettings;
-import com.netprogs.minecraft.plugins.social.storage.SocialNetwork;
 import com.netprogs.minecraft.plugins.social.storage.data.perk.IPersonPerkSettings;
 
 import org.bukkit.Bukkit;
@@ -59,8 +58,6 @@ import org.bukkit.entity.Player;
  */
 public class CommandTell extends PerkCommand<TellSettings, IPersonPerkSettings> {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
     public CommandTell() {
         super(SocialNetworkCommandType.tell);
     }
@@ -83,7 +80,7 @@ public class CommandTell extends PerkCommand<TellSettings, IPersonPerkSettings> 
         Player player = (Player) sender;
 
         // make sure the sender is in the network
-        SocialPerson playerPerson = SocialNetwork.getInstance().getPerson(player.getName());
+        SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(player.getName());
         if (playerPerson == null) {
             throw new SenderNotInNetworkException();
         }
@@ -103,7 +100,7 @@ public class CommandTell extends PerkCommand<TellSettings, IPersonPerkSettings> 
         }
 
         // make sure the player is in the network
-        SocialPerson sendToPerson = SocialNetwork.getInstance().getPerson(sendPlayerName);
+        SocialPerson sendToPerson = SocialNetworkPlugin.getStorage().getPerson(sendPlayerName);
         if (sendToPerson == null) {
             throw new PlayerNotInNetworkException(sendPlayerName);
         }
@@ -123,14 +120,14 @@ public class CommandTell extends PerkCommand<TellSettings, IPersonPerkSettings> 
 
         // If I have them on ignore...
         // Check to see if the person they're trying to tell is on their own ignore list
-        if (playerPerson.isOnIgnore(sendToPerson.getName())) {
+        if (playerPerson.isOnIgnore(sendToPerson)) {
             MessageUtil.sendPlayerIgnoredMessage(player, sendToPerson.getName());
             return false;
         }
 
         // If they have me on ignore...
         // Check to see if the person they're sending a tell to is on their ignore list
-        if (sendToPerson.isOnIgnore(playerPerson.getName())) {
+        if (sendToPerson.isOnIgnore(playerPerson)) {
             MessageUtil.sendSenderIgnoredMessage(player, sendToPerson.getName());
             return false;
         }
@@ -192,7 +189,7 @@ public class CommandTell extends PerkCommand<TellSettings, IPersonPerkSettings> 
         // this command requires processing every time its used
         String sendPlayerName = commandArguments.get(0);
 
-        SocialPerson sendToPerson = SocialNetwork.getInstance().getPerson(sendPlayerName);
+        SocialPerson sendToPerson = SocialNetworkPlugin.getStorage().getPerson(sendPlayerName);
         if (sendToPerson != null) {
             return getPerkSettings(person, sendToPerson);
         }
@@ -211,12 +208,11 @@ public class CommandTell extends PerkCommand<TellSettings, IPersonPerkSettings> 
     public HelpSegment help() {
 
         HelpSegment helpSegment = new HelpSegment(getCommandType());
-        ResourcesConfig config = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
 
-        HelpMessage mainCommand = new HelpMessage();
-        mainCommand.setCommand(getCommandType().toString());
-        mainCommand.setArguments("<player> <message>");
-        mainCommand.setDescription(config.getResource("social.perk.tell.help.send"));
+        HelpMessage mainCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), null, "<player> <message>",
+                        config.getResource("social.perk.tell.help.send"));
         helpSegment.addEntry(mainCommand);
 
         return helpSegment;

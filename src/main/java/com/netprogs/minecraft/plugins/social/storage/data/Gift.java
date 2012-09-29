@@ -30,21 +30,27 @@ public class Gift implements IMessage {
 
     private String senderPlayerName;
     private String receiverPlayerName;
+
+    private String senderWorld;
+
     private Type type;
     private double amount;
     private int itemId;
     private int itemCount;
 
-    public Gift(Type type, String senderPlayerName, String receiverPlayerName, double amount) {
-        this.type = type;
+    public Gift(Type type, String senderPlayerName, String receiverPlayerName, String senderWorld, double amount) {
+        this.senderWorld = senderWorld;
         this.senderPlayerName = senderPlayerName;
         this.receiverPlayerName = receiverPlayerName;
+        this.type = type;
         this.amount = amount;
     }
 
-    public Gift(Type type, String senderPlayerName, String receiverPlayerName, int itemId, int itemCount) {
+    public Gift(Type type, String senderPlayerName, String receiverPlayerName, String senderWorld, int itemId,
+            int itemCount) {
         this.type = type;
         this.senderPlayerName = senderPlayerName;
+        this.senderWorld = senderWorld;
         this.receiverPlayerName = receiverPlayerName;
         this.itemId = itemId;
         this.itemCount = itemCount;
@@ -72,5 +78,9 @@ public class Gift implements IMessage {
 
     public String getReceiverPlayerName() {
         return receiverPlayerName;
+    }
+
+    public String getSenderWorld() {
+        return senderWorld;
     }
 }

@@ -42,7 +42,7 @@ public abstract class GroupSettings implements ISocialNetworkSettings {
     }
 
     // the group priority
-    private Priority priority;
+    private Priority priority = Priority.LOWEST;
 
     // This is the Permissions group that would be added to the user when this social group is active.
     private String permissionsGroup;

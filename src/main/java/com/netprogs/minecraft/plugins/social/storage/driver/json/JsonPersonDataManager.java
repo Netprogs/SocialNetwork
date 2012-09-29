@@ -1,11 +1,8 @@
 package com.netprogs.minecraft.plugins.social.storage.driver.json;
 
 import java.io.File;
-import java.util.logging.Logger;
 
 import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
-import com.netprogs.minecraft.plugins.social.config.settings.SettingsConfig;
 import com.netprogs.minecraft.plugins.social.storage.IPersonDataManager;
 import com.netprogs.minecraft.plugins.social.storage.data.Person;
 import com.netprogs.minecraft.plugins.social.storage.data.PersonSettings;
@@ -32,16 +29,12 @@ import com.netprogs.minecraft.plugins.social.storage.data.PersonSettings;
 
 public class JsonPersonDataManager implements IPersonDataManager {
 
-    private final Logger logger = Logger.getLogger("Minecraft");
-
     private static String DATA_FOLDER = SocialNetworkPlugin.instance.getDataFolder() + "/DataFiles/";
 
     @Override
     public Person loadPerson(String personName) {
 
-        if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-            logger.info("loadPerson: " + DATA_FOLDER + personName);
-        }
+        SocialNetworkPlugin.log("loadPerson: " + DATA_FOLDER + personName);
 
         // check to make sure they have a file, if not, they aren't in the network
         File checkFile = new File(DATA_FOLDER + personName);
@@ -53,15 +46,15 @@ public class JsonPersonDataManager implements IPersonDataManager {
             return config.getPerson();
         }
 
-        if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-            logger.info("[" + personName + "] No file found.");
-        }
+        SocialNetworkPlugin.log("[" + personName + "] No file found.");
 
         return null;
     }
 
     @Override
     public void savePerson(Person person) {
+
+        SocialNetworkPlugin.log("[" + person.getName() + "] Saving.");
 
         // this will create the file if it doesn't already exist
         PersonConfig config = new PersonConfig(DATA_FOLDER + person.getName(), person);
@@ -71,27 +64,26 @@ public class JsonPersonDataManager implements IPersonDataManager {
     @Override
     public void deletePerson(Person person) {
 
+        SocialNetworkPlugin.log("[" + person.getName() + "] Deleting.");
+
         // deletes the file
         File checkFile = new File(DATA_FOLDER + person.getName());
         checkFile.delete();
     }
 
     @Override
-    public PersonSettings loadPersonSettings(String personName) {
+    public PersonSettings loadPersonSettings(Person person) {
 
+        String personName = person.getName();
         String FILE_NAME = DATA_FOLDER + personName + ".settings";
 
-        if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-            logger.info("[" + personName + "] PersonSettings. Attempting to load: " + FILE_NAME);
-        }
+        SocialNetworkPlugin.log("[" + personName + "] PersonSettings. Attempting to load: " + FILE_NAME);
 
         // check to make sure they have a file, if not, they probably haven't saved any personal settings yet
         File checkFile = new File(FILE_NAME);
         if (checkFile.exists()) {
 
-            if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-                logger.info("[" + personName + "] PersonSettings. Calling config...");
-            }
+            SocialNetworkPlugin.log("[" + personName + "] PersonSettings. Calling config...");
 
             // now load their data
             PersonSettingsConfig config = new PersonSettingsConfig(FILE_NAME);
@@ -110,13 +102,12 @@ public class JsonPersonDataManager implements IPersonDataManager {
     }
 
     @Override
-    public void savePersonSettings(String personName, PersonSettings personSettings) {
+    public void savePersonSettings(Person person, PersonSettings personSettings) {
 
+        String personName = person.getName();
         String FILE_NAME = DATA_FOLDER + personName + ".settings";
 
-        if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-            logger.info("[" + personName + "] PersonSettings. Attempting to save: " + FILE_NAME);
-        }
+        SocialNetworkPlugin.log("[" + personName + "] PersonSettings. Attempting to save: " + FILE_NAME);
 
         // this will create the file if it doesn't already exist
         PersonSettingsConfig config = new PersonSettingsConfig(FILE_NAME, personSettings);
@@ -124,13 +115,12 @@ public class JsonPersonDataManager implements IPersonDataManager {
     }
 
     @Override
-    public void deletePersonSettings(String personName) {
+    public void deletePersonSettings(Person person) {
 
+        String personName = person.getName();
         String FILE_NAME = DATA_FOLDER + personName + ".settings";
 
-        if (PluginConfig.getInstance().getConfig(SettingsConfig.class).isLoggingDebug()) {
-            logger.info("[" + personName + "] PersonSettings. Attempting to save: " + FILE_NAME);
-        }
+        SocialNetworkPlugin.log("[" + personName + "] PersonSettings. Attempting to save: " + FILE_NAME);
 
         File checkFile = new File(FILE_NAME);
         checkFile.delete();

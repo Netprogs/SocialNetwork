@@ -46,12 +46,6 @@ public abstract class PerkListener<S extends IPerkSettings, P extends IPersonPer
         return listenerType;
     }
 
-    // @Override
-    // public S getPerkSettings(SocialPerson person) {
-    //
-    // return getPerkSettingsBase(person);
-    // }
-
     /**
      * Gets the IPerkSettings based on only the person's highest priority social group.
      * @param person

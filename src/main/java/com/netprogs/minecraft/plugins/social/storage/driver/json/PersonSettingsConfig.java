@@ -1,10 +1,11 @@
 package com.netprogs.minecraft.plugins.social.storage.driver.json;
 
-import com.google.gson.GsonBuilder;
-import com.netprogs.minecraft.plugins.social.config.JsonConfiguration;
-import com.netprogs.minecraft.plugins.social.config.JsonInterfaceAdapter;
+import com.netprogs.minecraft.plugins.social.io.JsonConfiguration;
+import com.netprogs.minecraft.plugins.social.io.JsonInterfaceAdapter;
 import com.netprogs.minecraft.plugins.social.storage.data.PersonSettings;
 import com.netprogs.minecraft.plugins.social.storage.data.perk.IPersonPerkSettings;
+
+import org.bukkit.craftbukkit.libs.com.google.gson.GsonBuilder;
 
 /*
  * Copyright (C) 2012 Scott Milne

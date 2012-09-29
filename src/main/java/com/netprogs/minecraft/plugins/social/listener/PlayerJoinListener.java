@@ -1,17 +1,20 @@
 package com.netprogs.minecraft.plugins.social.listener;
 
+import java.util.Map;
+
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
+import com.netprogs.minecraft.plugins.social.command.util.MessageParameter;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.event.PlayerMessageCountEvent;
-import com.netprogs.minecraft.plugins.social.storage.SocialNetwork;
 import com.netprogs.minecraft.plugins.social.storage.data.Alert;
 import com.netprogs.minecraft.plugins.social.storage.data.Gift;
 import com.netprogs.minecraft.plugins.social.storage.data.Request;
 import com.netprogs.minecraft.plugins.social.storage.data.Sticky;
 
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -45,38 +48,90 @@ public class PlayerJoinListener implements Listener {
 
         // When the player logs in, check to see what messages they have waiting for them
 
-        // We only want to check for our types. Other people may be placing messages into the queue, but we don't want
-        // to display them here.
-
         // verify that the sender is actually a player
         if (event.getPlayer() instanceof Player) {
 
+            Player player = event.getPlayer();
+
             // check to see if they're part of the network
-            SocialPerson playerPerson = SocialNetwork.getInstance().getPerson(event.getPlayer().getName());
-            if (playerPerson != null) {
+            SocialPerson playerPerson = SocialNetworkPlugin.getStorage().getPerson(player.getName());
+            if (playerPerson == null) {
 
-                // now let's check to see what's available to them.
-                int alertsCount = playerPerson.getMessagesCount(Alert.class);
-                int requestsCount = playerPerson.getMessagesCount(Request.class);
+                // If no person object was found, it means they're a new player.
+                // At this point we'll create them an account.
+                if (SocialNetworkPlugin.getSettings().isAutoJoinOnLogin()) {
+                    playerPerson = SocialNetworkPlugin.getStorage().addPerson(player);
+                }
+            }
 
-                // send out responses to the player
-                MessageUtil.sendHeaderMessage(event.getPlayer(), "social.login.welcome.sender");
+            // Check for this to be NULL again. If it is, it means the player wishes to be excluded
+            if (playerPerson == null) {
+                return;
+            }
 
-                // Requests
-                String requestSenderMessage =
-                        PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                                .getResource("social.message.requests");
-                MessageUtil.sendLoginMessageCountMessage(event.getPlayer(), requestSenderMessage, requestsCount);
+            // enable their chat upon login (in case they forgot about it or crashed)
+            SocialNetworkPlugin.getChatManager().enable(event.getPlayer());
 
-                // Alerts
-                String alertSenderMessage =
-                        PluginConfig.getInstance().getConfig(ResourcesConfig.class)
-                                .getResource("social.message.alerts");
-                MessageUtil.sendLoginMessageCountMessage(event.getPlayer(), alertSenderMessage, alertsCount);
+            // We want to notify everyone that is in this players groups that they have logged in.
+            // Make sure that the event timer for this has expired. This is used to avoid spamming the chat.
+            long timeRemaining = SocialNetworkPlugin.getTimerManager().eventOnTimer(player.getName(), "LOGIN");
+            if (timeRemaining <= 0) {
 
-                // now that we've created our initial response, fire off our event letting anyone else add to it
-                PlayerMessageCountEvent countEvent = new PlayerMessageCountEvent(event.getPlayer(), playerPerson);
-                Bukkit.getServer().getPluginManager().callEvent(countEvent);
+                // Get the list of all unique player among all their groups
+                // Then for each of those report that this person has logged in
+                Map<String, SocialPerson> notifyPlayers =
+                        SocialNetworkPlugin.getStorage().getNotificationPlayers(playerPerson);
+
+                for (String notifyPlayerName : notifyPlayers.keySet()) {
+
+                    // check to see if this person wants to receive login notifications
+                    SocialPerson notifySocialPerson = notifyPlayers.get(notifyPlayerName);
+                    if (!notifySocialPerson.isLoginUpdatesIgnored()) {
+
+                        Player notifyPlayer = Bukkit.getPlayer(notifyPlayerName);
+                        if (notifyPlayer != null) {
+                            MessageUtil.sendMessage(notifyPlayer, "social.group.login", ChatColor.GREEN,
+                                    new MessageParameter("<player>", playerPerson.getName(), ChatColor.AQUA));
+                        }
+                    }
+                }
+
+                // reset their timer for this notification
+                long cooldown = SocialNetworkPlugin.getSettings().getLoginNotificationCooldown();
+                SocialNetworkPlugin.getTimerManager().updateEventTimer(player.getName(), "LOGIN", cooldown);
+            }
+
+            // now let's check to see what's available to them.
+            int alertsCount = playerPerson.getMessagesCount(Alert.class);
+            int requestsCount = playerPerson.getMessagesCount(Request.class);
+
+            // send out responses to the player
+            MessageUtil.sendHeaderMessage(event.getPlayer(), "social.login.welcome.sender");
+
+            ResourcesConfig resources = SocialNetworkPlugin.getResources();
+
+            // Requests
+            String requestSenderMessage = resources.getResource("social.message.requests");
+            MessageUtil.sendLoginMessageCountMessage(event.getPlayer(), requestSenderMessage, requestsCount);
+
+            // Alerts
+            String alertSenderMessage = resources.getResource("social.message.alerts");
+            MessageUtil.sendLoginMessageCountMessage(event.getPlayer(), alertSenderMessage, alertsCount);
+
+            // now that we've created our initial response, fire off our event letting anyone else add to it
+            PlayerMessageCountEvent countEvent = new PlayerMessageCountEvent(event.getPlayer(), playerPerson);
+            Bukkit.getServer().getPluginManager().callEvent(countEvent);
+
+            // check to see if we need to send out a gender choice reminder
+            boolean genderChoiceRequired = SocialNetworkPlugin.getSettings().isGenderChoiceRequired();
+            boolean genderChoiceReminderEnabled = SocialNetworkPlugin.getSettings().isGenderChoiceReminderEnabled();
+
+            if (genderChoiceRequired && genderChoiceReminderEnabled && playerPerson.getGender() == null
+                    && !playerPerson.isGenderChoiceRemindersIgnored()) {
+
+                // now tell the user they need to use the /social gender <male/female> command
+                MessageUtil.sendMessage(player, "social.gender.choose.reminder.sender", ChatColor.RED);
+                MessageUtil.sendMessage(player, "social.gender.choose.commands.sender", ChatColor.GREEN);
             }
         }
     }
@@ -89,12 +144,8 @@ public class PlayerJoinListener implements Listener {
     public void onPlayerStickyMessageCountEvent(PlayerMessageCountEvent event) {
 
         SocialPerson person = event.getPlayerPerson();
-
         int count = person.getMessagesCount(Sticky.class);
-
-        String stickySenderMessage =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class).getResource("social.message.stickies");
-
+        String stickySenderMessage = SocialNetworkPlugin.getResources().getResource("social.message.stickies");
         MessageUtil.sendLoginMessageCountMessage(event.getPlayer(), stickySenderMessage, count);
     }
 
@@ -106,12 +157,8 @@ public class PlayerJoinListener implements Listener {
     public void onPlayerGiftMessageCountEvent(PlayerMessageCountEvent event) {
 
         SocialPerson person = event.getPlayerPerson();
-
         int count = person.getMessagesCount(Gift.class);
-
-        String giftSenderMessage =
-                PluginConfig.getInstance().getConfig(ResourcesConfig.class).getResource("social.message.gifts");
-
+        String giftSenderMessage = SocialNetworkPlugin.getResources().getResource("social.message.gifts");
         MessageUtil.sendLoginMessageCountMessage(event.getPlayer(), giftSenderMessage, count);
     }
 }

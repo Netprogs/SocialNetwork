@@ -1,8 +1,8 @@
 package com.netprogs.minecraft.plugins.social.command.perk;
 
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.config.settings.perk.IPerkSettings;
-import com.netprogs.minecraft.plugins.social.integration.VaultIntegration;
 import com.netprogs.minecraft.plugins.social.perk.PerkBase;
 import com.netprogs.minecraft.plugins.social.storage.data.perk.IPersonPerkSettings;
 
@@ -46,7 +46,7 @@ public abstract class PerkCommand<T extends IPerkSettings, P extends IPersonPerk
 
     @Override
     public boolean hasCommandPermission(CommandSender sender) {
-        return VaultIntegration.getInstance().hasCommandPermission(sender, commandType);
+        return SocialNetworkPlugin.getVault().hasCommandPermission(sender, commandType);
     }
 
     /**

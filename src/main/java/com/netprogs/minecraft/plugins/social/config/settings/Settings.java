@@ -27,14 +27,28 @@ import com.netprogs.minecraft.plugins.social.config.settings.perk.IPerkSettings;
 
 public class Settings {
 
+    private boolean autoJoinOnLogin;
+
     private boolean genderChoiceRequired;
+    private boolean genderChoiceFreezeEnabled;
+    private boolean genderChoiceReminderEnabled;
+
     private boolean sameGenderMarriageAllowed;
+
+    private boolean multiWorldGiftsAllowed;
+
     private boolean globalAnnouncePriestMarriages;
+
+    private long loginNotificationCooldown;
+    private long statusMessageNotificationCooldown;
+
     private boolean loggingDebug;
 
     private SocialGroupSettings groupSettings;
 
     private List<? extends IPerkSettings> perkSettings = new ArrayList<IPerkSettings>();
+
+    private CommandMapSettings commandMapSettings;
 
     public boolean isLoggingDebug() {
         return loggingDebug;
@@ -83,5 +97,61 @@ public class Settings {
 
     public <U extends IPerkSettings> void setPerkSettings(List<U> perkSettings) {
         this.perkSettings = perkSettings;
+    }
+
+    public CommandMapSettings getCommandMapSettings() {
+        return commandMapSettings;
+    }
+
+    public void setCommandMapSettings(CommandMapSettings commandMapSettings) {
+        this.commandMapSettings = commandMapSettings;
+    }
+
+    public long getStatusMessageNotificationCooldown() {
+        return statusMessageNotificationCooldown;
+    }
+
+    public void setStatusMessageNotificationCooldown(long statusMessageNotificationCooldown) {
+        this.statusMessageNotificationCooldown = statusMessageNotificationCooldown;
+    }
+
+    public long getLoginNotificationCooldown() {
+        return loginNotificationCooldown;
+    }
+
+    public void setLoginNotificationCooldown(long loginNotificationCooldown) {
+        this.loginNotificationCooldown = loginNotificationCooldown;
+    }
+
+    public boolean isGenderChoiceFreezeEnabled() {
+        return genderChoiceFreezeEnabled;
+    }
+
+    public void setGenderChoiceFreezeEnabled(boolean genderChoiceFreezeEnabled) {
+        this.genderChoiceFreezeEnabled = genderChoiceFreezeEnabled;
+    }
+
+    public boolean isGenderChoiceReminderEnabled() {
+        return genderChoiceReminderEnabled;
+    }
+
+    public void setGenderChoiceReminderEnabled(boolean genderChoiceReminderEnabled) {
+        this.genderChoiceReminderEnabled = genderChoiceReminderEnabled;
+    }
+
+    public boolean isAutoJoinOnLogin() {
+        return autoJoinOnLogin;
+    }
+
+    public void setAutoJoinOnLogin(boolean autoJoinOnLogin) {
+        this.autoJoinOnLogin = autoJoinOnLogin;
+    }
+
+    public boolean isMultiWorldGiftsAllowed() {
+        return multiWorldGiftsAllowed;
+    }
+
+    public void setMultiWorldGiftsAllowed(boolean multiWorldGiftsAllowed) {
+        this.multiWorldGiftsAllowed = multiWorldGiftsAllowed;
     }
 }

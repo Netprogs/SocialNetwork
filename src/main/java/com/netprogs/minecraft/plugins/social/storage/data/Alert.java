@@ -25,7 +25,7 @@ import com.netprogs.minecraft.plugins.social.storage.IMessage;
 public class Alert implements IMessage {
 
     public enum Type {
-        quit
+        deleted
     }
 
     // we can't save this type so we need to store it as a string instead and convert back later

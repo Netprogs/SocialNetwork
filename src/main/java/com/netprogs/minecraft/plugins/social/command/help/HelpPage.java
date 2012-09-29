@@ -3,6 +3,9 @@ package com.netprogs.minecraft.plugins.social.command.help;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.netprogs.minecraft.plugins.social.command.ISocialNetworkCommand;
+import com.netprogs.minecraft.plugins.social.config.settings.ISocialNetworkSettings;
+
 import org.apache.commons.lang.StringUtils;
 
 /*
@@ -29,6 +32,9 @@ public class HelpPage {
 
     private String title;
 
+    private List<ISocialNetworkCommand<? extends ISocialNetworkSettings>> commands =
+            new ArrayList<ISocialNetworkCommand<? extends ISocialNetworkSettings>>();
+
     public HelpPage() {
         this.title = StringUtils.EMPTY;
     }
@@ -37,14 +43,12 @@ public class HelpPage {
         this.title = title;
     }
 
-    private List<HelpSegment> segments = new ArrayList<HelpSegment>();
-
-    public List<HelpSegment> getSegments() {
-        return segments;
+    public List<ISocialNetworkCommand<? extends ISocialNetworkSettings>> getCommands() {
+        return commands;
     }
 
-    public void addSegment(HelpSegment segment) {
-        this.segments.add(segment);
+    public void addCommand(ISocialNetworkCommand<? extends ISocialNetworkSettings> command) {
+        this.commands.add(command);
     }
 
     public String getTitle() {

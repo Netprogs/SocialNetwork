@@ -1,16 +1,14 @@
 package com.netprogs.minecraft.plugins.social.command.group;
 
-import java.util.logging.Logger;
-
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommandType;
+import com.netprogs.minecraft.plugins.social.command.help.HelpBook;
 import com.netprogs.minecraft.plugins.social.command.help.HelpMessage;
 import com.netprogs.minecraft.plugins.social.command.help.HelpSegment;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.group.FriendSettings;
-import com.netprogs.minecraft.plugins.social.integration.VaultIntegration;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -37,8 +35,6 @@ import org.bukkit.entity.Player;
  */
 
 public class CommandFriend extends GroupCommand<FriendSettings> {
-
-    private final Logger logger = Logger.getLogger("Minecraft");
 
     public CommandFriend() {
         super(SocialNetworkCommandType.friend);
@@ -112,7 +108,7 @@ public class CommandFriend extends GroupCommand<FriendSettings> {
     @Override
     protected boolean personInGroup(SocialPerson playerPerson, SocialPerson inGroupPerson) {
 
-        return playerPerson.isFriendWith(inGroupPerson.getName());
+        return playerPerson.isFriendWith(inGroupPerson);
     }
 
     /**
@@ -124,7 +120,7 @@ public class CommandFriend extends GroupCommand<FriendSettings> {
     protected void addPersonToGroup(SocialPerson playerPerson, SocialPerson addPerson) {
 
         // create and add a friend to the playerPerson friend list
-        playerPerson.addFriend(addPerson.getName());
+        playerPerson.addFriend(addPerson);
 
         // check for a permissions update
         checkForPermissionsUpdate(playerPerson);
@@ -132,7 +128,7 @@ public class CommandFriend extends GroupCommand<FriendSettings> {
         // charge the user
         Player player = Bukkit.getServer().getPlayer(playerPerson.getName());
         if (player != null) {
-            VaultIntegration.getInstance().processCommandPurchase(player, getCommandSettings().getPerUseCost());
+            SocialNetworkPlugin.getVault().processCommandPurchase(player, getCommandSettings().getPerUseCost());
         }
     }
 
@@ -145,7 +141,7 @@ public class CommandFriend extends GroupCommand<FriendSettings> {
     protected void removePersonFromGroup(SocialPerson playerPerson, SocialPerson removePerson) {
 
         // remove them
-        playerPerson.removeFriend(removePerson.getName());
+        playerPerson.removeFriend(removePerson);
 
         // check for a permissions update
         checkForPermissionsUpdate(playerPerson);
@@ -163,46 +159,81 @@ public class CommandFriend extends GroupCommand<FriendSettings> {
         displayGroupList(player, playerPerson.getFriends());
     }
 
+    /**
+     * Provides the chance to display a help page to player who have been sent a request.
+     * @param receiver The player to receive the help message.
+     */
+    @Override
+    protected void displayRequestHelp(Player receiver) {
+
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
+
+        HelpMessage acceptCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "accept", "<player>",
+                        config.getResource("social.friend.help.accept"));
+        MessageUtil.sendMessage(receiver, acceptCommand.display());
+
+        HelpMessage rejectCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "reject", "<player>",
+                        config.getResource("social.friend.help.reject"));
+        MessageUtil.sendMessage(receiver, rejectCommand.display());
+
+        HelpMessage ignoreCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "ignore", "<player>",
+                        config.getResource("social.friend.help.ignore"));
+        MessageUtil.sendMessage(receiver, ignoreCommand.display());
+    }
+
     @Override
     public HelpSegment help() {
 
-        HelpSegment helpSegment = new HelpSegment(getCommandType());
-        ResourcesConfig config = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
 
-        HelpMessage mainCommand = new HelpMessage();
-        mainCommand.setCommand(getCommandType().toString());
-        mainCommand.setArguments("request <player>");
-        mainCommand.setDescription(config.getResource("social.friend.help.request"));
+        HelpSegment helpSegment = new HelpSegment(getCommandType());
+
+        HelpMessage mainCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "request", "<player>",
+                        config.getResource("social.friend.help.request"));
         helpSegment.addEntry(mainCommand);
 
-        HelpMessage acceptCommand = new HelpMessage();
-        acceptCommand.setCommand(getCommandType().toString());
-        acceptCommand.setArguments("accept <player>");
-        acceptCommand.setDescription(config.getResource("social.friend.help.accept"));
+        HelpMessage acceptCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "accept", "<player>",
+                        config.getResource("social.friend.help.accept"));
         helpSegment.addEntry(acceptCommand);
 
-        HelpMessage rejectCommand = new HelpMessage();
-        rejectCommand.setCommand(getCommandType().toString());
-        rejectCommand.setArguments("reject <player>");
-        rejectCommand.setDescription(config.getResource("social.friend.help.reject"));
+        HelpMessage acceptAllCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "acceptall", null,
+                        config.getResource("social.friend.help.acceptall"));
+        helpSegment.addEntry(acceptAllCommand);
+
+        HelpMessage rejectCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "reject", "<player>",
+                        config.getResource("social.friend.help.reject"));
         helpSegment.addEntry(rejectCommand);
 
-        HelpMessage ignoreCommand = new HelpMessage();
-        ignoreCommand.setCommand(getCommandType().toString());
-        ignoreCommand.setArguments("ignore <player>");
-        ignoreCommand.setDescription(config.getResource("social.friend.help.ignore"));
+        HelpMessage rejectAllCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "rejectall", null,
+                        config.getResource("social.friend.help.rejectall"));
+        helpSegment.addEntry(rejectAllCommand);
+
+        HelpMessage ignoreCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "ignore", "<player>",
+                        config.getResource("social.friend.help.ignore"));
         helpSegment.addEntry(ignoreCommand);
 
-        HelpMessage removeCommand = new HelpMessage();
-        removeCommand.setCommand(getCommandType().toString());
-        removeCommand.setArguments("remove <player>");
-        removeCommand.setDescription(config.getResource("social.friend.help.remove"));
+        HelpMessage ignoreAllCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "ignoreall", null,
+                        config.getResource("social.friend.help.ignoreall"));
+        helpSegment.addEntry(ignoreAllCommand);
+
+        HelpMessage removeCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "remove", "<player>",
+                        config.getResource("social.friend.help.remove"));
         helpSegment.addEntry(removeCommand);
 
-        HelpMessage listCommand = new HelpMessage();
-        listCommand.setCommand(getCommandType().toString());
-        listCommand.setArguments("list");
-        listCommand.setDescription(config.getResource("social.friend.help.list"));
+        HelpMessage listCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "list", null,
+                        config.getResource("social.friend.help.list"));
         helpSegment.addEntry(listCommand);
 
         return helpSegment;

@@ -1,18 +1,16 @@
 package com.netprogs.minecraft.plugins.social.command.group;
 
-import java.util.logging.Logger;
-
+import com.netprogs.minecraft.plugins.social.SocialNetworkPlugin;
 import com.netprogs.minecraft.plugins.social.SocialPerson;
 import com.netprogs.minecraft.plugins.social.command.SocialNetworkCommandType;
 import com.netprogs.minecraft.plugins.social.command.exception.ArgumentsMissingException;
 import com.netprogs.minecraft.plugins.social.command.exception.PlayerNotInNetworkException;
+import com.netprogs.minecraft.plugins.social.command.help.HelpBook;
 import com.netprogs.minecraft.plugins.social.command.help.HelpMessage;
 import com.netprogs.minecraft.plugins.social.command.help.HelpSegment;
 import com.netprogs.minecraft.plugins.social.command.util.MessageUtil;
-import com.netprogs.minecraft.plugins.social.config.PluginConfig;
 import com.netprogs.minecraft.plugins.social.config.resources.ResourcesConfig;
 import com.netprogs.minecraft.plugins.social.config.settings.group.ChildSettings;
-import com.netprogs.minecraft.plugins.social.integration.VaultIntegration;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -39,8 +37,6 @@ import org.bukkit.entity.Player;
  */
 
 public class CommandChild extends GroupCommand<ChildSettings> {
-
-    private final Logger logger = Logger.getLogger("Minecraft");
 
     public CommandChild() {
         super(SocialNetworkCommandType.child);
@@ -77,6 +73,13 @@ public class CommandChild extends GroupCommand<ChildSettings> {
         // We want to make sure the receiverPerson isn't already a child of someone
         if (receiverPerson.getChildOf() != null) {
             MessageUtil.sendMessage(playerPerson, "social." + getCommandType() + ".cannotSendRequest.sender",
+                    ChatColor.RED);
+            return false;
+        }
+
+        // We want to make sure the receiverPerson isn't married to the sender
+        if (playerPerson.isMarriedTo(receiverPerson)) {
+            MessageUtil.sendMessage(playerPerson, "social." + getCommandType() + ".cannotSendRequest.married.sender",
                     ChatColor.RED);
             return false;
         }
@@ -130,8 +133,8 @@ public class CommandChild extends GroupCommand<ChildSettings> {
     @Override
     protected boolean personInGroup(SocialPerson playerPerson, SocialPerson inGroupPerson) {
 
-        // check to see if they are already a child of yours
-        return playerPerson.isParentOf(inGroupPerson.getName());
+        // check to see if they are a parent or child of the group person
+        return playerPerson.isParentOf(inGroupPerson) || playerPerson.isChildOf(inGroupPerson);
     }
 
     /**
@@ -143,10 +146,10 @@ public class CommandChild extends GroupCommand<ChildSettings> {
     protected void addPersonToGroup(SocialPerson playerPerson, SocialPerson addPerson) {
 
         // add the child
-        playerPerson.addChild(addPerson.getName());
+        playerPerson.addChild(addPerson);
 
         // add the parent to the childOf
-        addPerson.createChildOf(playerPerson.getName());
+        addPerson.createChildOf(playerPerson);
 
         // check for a permissions update
         checkForPermissionsUpdate(playerPerson);
@@ -154,7 +157,7 @@ public class CommandChild extends GroupCommand<ChildSettings> {
         // charge the user
         Player player = Bukkit.getServer().getPlayer(playerPerson.getName());
         if (player != null) {
-            VaultIntegration.getInstance().processCommandPurchase(player, getCommandSettings().getPerUseCost());
+            SocialNetworkPlugin.getVault().processCommandPurchase(player, getCommandSettings().getPerUseCost());
         }
     }
 
@@ -167,7 +170,7 @@ public class CommandChild extends GroupCommand<ChildSettings> {
     protected void removePersonFromGroup(SocialPerson playerPerson, SocialPerson removePerson) {
 
         // remove the child (removePerson) from the parents (playerPerson) list
-        playerPerson.removeChild(removePerson.getName());
+        playerPerson.removeChild(removePerson);
 
         // clear the childOf value for removePerson making them have no parent
         removePerson.breakChildOf();
@@ -209,7 +212,7 @@ public class CommandChild extends GroupCommand<ChildSettings> {
             removePersonFromGroup(removePerson, playerPerson);
 
             // clear the childOf
-            playerPerson.breakChildOf();
+            // playerPerson.breakChildOf();
 
         } else if (playerPerson.getChildOf() == null) {
 
@@ -219,7 +222,7 @@ public class CommandChild extends GroupCommand<ChildSettings> {
             removePersonFromGroup(playerPerson, removePerson);
 
             // clear the childOf
-            removePerson.breakChildOf();
+            // removePerson.breakChildOf();
         }
     }
 
@@ -235,47 +238,81 @@ public class CommandChild extends GroupCommand<ChildSettings> {
         displayGroupList(player, playerPerson.getChildren());
     }
 
+    /**
+     * Provides the chance to display a help page to player who have been sent a request.
+     * @param receiver The player to receive the help message.
+     */
+    @Override
+    protected void displayRequestHelp(Player receiver) {
+
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
+
+        HelpMessage acceptCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "accept", "<player>",
+                        config.getResource("social.child.help.accept"));
+        MessageUtil.sendMessage(receiver, acceptCommand.display());
+
+        HelpMessage rejectCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "reject", "<player>",
+                        config.getResource("social.child.help.reject"));
+        MessageUtil.sendMessage(receiver, rejectCommand.display());
+
+        HelpMessage ignoreCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "ignore", "<player>",
+                        config.getResource("social.child.help.ignore"));
+        MessageUtil.sendMessage(receiver, ignoreCommand.display());
+    }
+
     @Override
     public HelpSegment help() {
 
         HelpSegment helpSegment = new HelpSegment(getCommandType());
 
-        ResourcesConfig config = PluginConfig.getInstance().getConfig(ResourcesConfig.class);
+        ResourcesConfig config = SocialNetworkPlugin.getResources();
 
-        HelpMessage mainCommand = new HelpMessage();
-        mainCommand.setCommand(getCommandType().toString());
-        mainCommand.setArguments("request <player>");
-        mainCommand.setDescription(config.getResource("social.child.help.request"));
+        HelpMessage mainCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "request", "<player>",
+                        config.getResource("social.child.help.request"));
         helpSegment.addEntry(mainCommand);
 
-        HelpMessage acceptCommand = new HelpMessage();
-        acceptCommand.setCommand(getCommandType().toString());
-        acceptCommand.setArguments("accept <player>");
-        acceptCommand.setDescription(config.getResource("social.child.help.accept"));
+        HelpMessage acceptCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "accept", "<player>",
+                        config.getResource("social.child.help.accept"));
         helpSegment.addEntry(acceptCommand);
 
-        HelpMessage rejectCommand = new HelpMessage();
-        rejectCommand.setCommand(getCommandType().toString());
-        rejectCommand.setArguments("reject <player>");
-        rejectCommand.setDescription(config.getResource("social.child.help.reject"));
+        HelpMessage acceptAllCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "acceptall", null,
+                        config.getResource("social.child.help.acceptall"));
+        helpSegment.addEntry(acceptAllCommand);
+
+        HelpMessage rejectCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "reject", "<player>",
+                        config.getResource("social.child.help.reject"));
         helpSegment.addEntry(rejectCommand);
 
-        HelpMessage ignoreCommand = new HelpMessage();
-        ignoreCommand.setCommand(getCommandType().toString());
-        ignoreCommand.setArguments("ignore <player>");
-        ignoreCommand.setDescription(config.getResource("social.child.help.ignore"));
+        HelpMessage rejectAllCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "rejectall", null,
+                        config.getResource("social.child.help.rejectall"));
+        helpSegment.addEntry(rejectAllCommand);
+
+        HelpMessage ignoreCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "ignore", "<player>",
+                        config.getResource("social.child.help.ignore"));
         helpSegment.addEntry(ignoreCommand);
 
-        HelpMessage removeCommand = new HelpMessage();
-        removeCommand.setCommand(getCommandType().toString());
-        removeCommand.setArguments("remove <player>");
-        removeCommand.setDescription(config.getResource("social.child.help.remove"));
+        HelpMessage ignoreAllCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "ignoreall", null,
+                        config.getResource("social.child.help.ignoreall"));
+        helpSegment.addEntry(ignoreAllCommand);
+
+        HelpMessage removeCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "remove", "<player>",
+                        config.getResource("social.child.help.remove"));
         helpSegment.addEntry(removeCommand);
 
-        HelpMessage listCommand = new HelpMessage();
-        listCommand.setCommand(getCommandType().toString());
-        listCommand.setArguments("list");
-        listCommand.setDescription(config.getResource("social.child.help.list"));
+        HelpMessage listCommand =
+                HelpBook.generateHelpMessage(getCommandType().toString(), "list", null,
+                        config.getResource("social.child.help.list"));
         helpSegment.addEntry(listCommand);
 
         return helpSegment;
